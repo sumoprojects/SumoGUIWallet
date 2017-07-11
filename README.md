@@ -1,0 +1,2 @@
+# SumoGUIWallet
+Sumokoin GUI Wallet
