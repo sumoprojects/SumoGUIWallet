@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 ## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 '''
 Hub is a communication medium between Python codes and web UI
@@ -285,8 +287,15 @@ class Hub(QObject):
     def rescan_spent(self):
         self.app_process_events()
         self.ui.wallet_rpc_manager.rpc_request.rescan_spent()
+        
+        # refresh wallet_info tx cache
+        self.ui.wallet_info.top_tx_height = 0
+        self.ui.wallet_info.bc_height = -1
+        self.ui.wallet_info.wallet_transfers = []
         self.ui.update_wallet_info()
+        
         self.on_wallet_rescan_spent_completed_event.emit()
+    
         
     @Slot()
     def rescan_bc(self):
@@ -299,7 +308,13 @@ class Hub(QObject):
         
         self.app_process_events()
         self.ui.wallet_rpc_manager.rpc_request.rescan_bc()
+        
+        # refresh wallet_info tx cache
+        self.ui.wallet_info.top_tx_height = 0
+        self.ui.wallet_info.bc_height = -1
+        self.ui.wallet_info.wallet_transfers = []
         self.ui.update_wallet_info()
+        
         self.on_wallet_rescan_bc_completed_event.emit()
     
         

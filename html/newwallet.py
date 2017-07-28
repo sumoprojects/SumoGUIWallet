@@ -101,7 +101,7 @@ html ="""
                 background-color: #666;
                 color: #76A500;
                 background-position: center center;
-                font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+                font-family: "RoboReg", "Helvetica Neue",Helvetica,Arial,sans-serif;
                 font-size: 14px;
                 margin: 0;
                 padding: 0;

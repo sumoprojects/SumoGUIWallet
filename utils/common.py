@@ -26,13 +26,14 @@ def getAppPath():
     #Determine if the application is a py/pyw or a frozen exe.
     if hasattr(sys, 'frozen'):
         # If run from exe
-        dir_path = os.path.dirname(sys.executable)
+        dir_path = os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
     elif '__file__' in locals():
         # If run from py
-        dir_path = os.path.dirname(__file__)
+        dir_path = os.path.dirname(unicode(__file__, sys.getfilesystemencoding()))
     else:
         # If run from command line
-        dir_path = sys.path[0]
+        #dir_path = sys.path[0]
+        dir_path = os.getcwdu()
     return dir_path
 
     

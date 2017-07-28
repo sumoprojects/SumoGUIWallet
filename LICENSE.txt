@@ -1,6 +1,4 @@
 Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
-Copyright (c) 2014-2017, The Monero Project
-Copyright (c) 2012-2013, The Cryptonote developers
 
 All rights reserved.
 
@@ -29,5 +27,9 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+------------------------------------------------------------------------------
+Parts of binaries included:
++ Copyright (c) 2014-2017, The Monero Project
++ Copyright (c) 2012-2013, The Cryptonote developers
 ------------------------------------------------------------------------------
 + PySide is licensed under the LGPL version 2.1 license
