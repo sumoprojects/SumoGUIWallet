@@ -1,8 +1,7 @@
-'''
-Created on May 17, 2017
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 
-@author: Sumokoin Project
-'''
 from __future__ import print_function
 
 #!/usr/bin/python
@@ -30,7 +29,9 @@ DETACHED_PROCESS = 0x00000008  # forcing the child to have no console at all
 class ProcessManager(Thread):
     def __init__(self, proc_args, proc_name=""):
         Thread.__init__(self)
-        self.proc = Popen(proc_args.split(' '), shell=False, 
+        args_array = proc_args.encode( sys.getfilesystemencoding() ).split(u' ')
+        self.proc = Popen(args_array,
+                          shell=False, 
                           stdout=PIPE, stderr=STDOUT, stdin=PIPE, 
                           creationflags=CREATE_NO_WINDOW)
         self.proc_name = proc_name
@@ -72,7 +73,7 @@ class ProcessManager(Thread):
 
 class SumokoindManager(ProcessManager):
     def __init__(self, resources_path, log_level=0, block_sync_size=50):
-        proc_args = '%s/bin/sumokoind --log-level %d --block-sync-size %d' % (resources_path, log_level, block_sync_size)
+        proc_args = u'%s/bin/sumokoind --log-level %d --block-sync-size %d' % (resources_path, log_level, block_sync_size)
         ProcessManager.__init__(self, proc_args, "sumokoind")
         self.synced = Event()
         self.stopped = Event()
@@ -100,10 +101,10 @@ class WalletCliManager(ProcessManager):
     
     def __init__(self, resources_path, wallet_file_path, wallet_log_path, restore_wallet=False):
         if not restore_wallet:
-            wallet_args = '%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' \
+            wallet_args = u'%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' \
                                                 % (resources_path, wallet_file_path, wallet_log_path)
         else:
-            wallet_args = '%s/bin/sumo-wallet-cli --log-file=%s --daemon-port 19735 --restore-deterministic-wallet' \
+            wallet_args = u'%s/bin/sumo-wallet-cli --log-file=%s --daemon-port 19735 --restore-deterministic-wallet' \
                                                 % (resources_path, wallet_log_path)
         ProcessManager.__init__(self, wallet_args, "sumo-wallet-cli")
         self.ready = Event()
@@ -141,7 +142,7 @@ class WalletRPCManager(ProcessManager):
     def __init__(self, resources_path, wallet_file_path, wallet_password, app, log_level=2):
         self.user_agent = str(uuid4().hex)
         wallet_log_path = os.path.join(os.path.dirname(wallet_file_path), "sumo-wallet-rpc.log")
-        wallet_rpc_args = '%s/bin/sumo-wallet-rpc --wallet-file %s --log-file %s --rpc-bind-port 19736 --user-agent %s --log-level %d' \
+        wallet_rpc_args = u'%s/bin/sumo-wallet-rpc --wallet-file %s --log-file %s --rpc-bind-port 19736 --user-agent %s --log-level %d' \
                                             % (resources_path, wallet_file_path, wallet_log_path, self.user_agent, log_level)
                                                                                 
         ProcessManager.__init__(self, wallet_rpc_args, "sumo-wallet-rpc")

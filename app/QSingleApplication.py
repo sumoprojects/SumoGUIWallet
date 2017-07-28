@@ -15,7 +15,7 @@ from PySide.QtNetwork import QLocalServer, QLocalSocket
 
 from utils.common import getSockDir, makeDir
 
-DATA_DIR = str(makeDir(os.path.join(getSockDir(), 'SumokoinGUIWallet')))
+DATA_DIR = makeDir(os.path.join(getSockDir(), 'SumokoinGUIWallet'))
     
 class QSingleApplication(QApplication):
     sock_file = 'sumokoin_wallet_sock'

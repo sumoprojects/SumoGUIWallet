@@ -18,7 +18,7 @@ APP_NAME = "Sumokoin Wallet"
 VERSION = [0, 0, 1]
 
 
-_data_dir = str(makeDir(os.path.join(getHomeDir(), 'SumokoinGUIWallet')))
+_data_dir = makeDir(os.path.join(getHomeDir(), 'SumokoinGUIWallet'))
 DATA_DIR = _data_dir
 
 log_file  = os.path.join(DATA_DIR, 'logs', 'app.log') # default logging file
