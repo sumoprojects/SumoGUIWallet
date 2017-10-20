@@ -5,13 +5,8 @@
 Misc utility classes/functions for application
 '''
 
-import os, sys, string
+import os, sys, string, io
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-    
 
 class DummyStream:
     ''' dummyStream behaves like a stream but does nothing. '''
@@ -20,7 +15,7 @@ class DummyStream:
     def read(self,data): pass
     def flush(self): pass
     def close(self): pass
-    
+
 def getAppPath():
     '''Get the path to this script no matter how it's run.'''
     #Determine if the application is a py/pyw or a frozen exe.
@@ -33,10 +28,10 @@ def getAppPath():
     else:
         # If run from command line
         #dir_path = sys.path[0]
-        dir_path = os.getcwdu()
+        dir_path = os.getcwd()
     return dir_path
 
-    
+
 def getHomeDir():
     if sys.platform == 'win32':
         import winpaths
@@ -52,7 +47,7 @@ def getSockDir():
     else:
         homedir = os.path.expanduser("~")
     return homedir
-    
+
 def makeDir(d):
     if not os.path.exists(d):
         os.makedirs(d)
@@ -76,7 +71,7 @@ def readFile(path, offset=0, size=-1, xor_data=False):
     data = fd.read(size)
     fd.close()
     return _xorData(data) if xor_data else data
-    
+
 def writeFile(path, buf, offset=0, xor_data=False):
     """Write specified block on file at the given offset"""
     if xor_data:
@@ -100,4 +95,3 @@ def print_money2(amount):
     except:
         raise Exception("Error parsing amount. Money amount must be an integer.")
     return "%s" % ("{:,.9f}".format(amount/1000000000.))
-    

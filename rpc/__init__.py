@@ -13,7 +13,7 @@ from requests.exceptions import ConnectionError
 
 from uuid import uuid4
 
-from Queue import Queue
+import queue
 from threading import Thread
 from multiprocessing import Event
 from time import sleep
@@ -38,16 +38,16 @@ wallet_rpc_errors = {
 
 class RPCRequest(Thread):
     headers = {'content-type': 'application/json'}
-    
+
     def __init__(self, rpc_input, url, app, user_agent=None):
         Thread.__init__(self)
         self.url = url
         self.rpc_input = rpc_input
         self.app = app
-            
+
         if user_agent is not None:
             self.headers.update({"User-Agent": user_agent})
-        
+
         self.response_queue = Queue(1)
         self.daemon = True
 
@@ -55,17 +55,17 @@ class RPCRequest(Thread):
     def run(self):
         res = self._send_request()
         self.response_queue.put(res)
-        
-    
+
+
     def stop(self):
         self.is_stopped = True
-    
-    
+
+
     def _send_request(self):
         global rpc_id
         rpc_id += 1
         self.rpc_input.update({"jsonrpc": "2.0", "id": "%d" % rpc_id})
-        
+
         try:
             response = requests.post(
                 self.url,
@@ -91,14 +91,14 @@ class RPCRequest(Thread):
                         break
                 return res_json['error']
         return res_json
-    
-    
+
+
     def get_result(self):
         while self.response_queue.empty():
             self.app.processEvents()
             sleep(.1)
         return self.response_queue.get()
-        
+
 
 
 class DaemonRPCRequest():
@@ -106,50 +106,50 @@ class DaemonRPCRequest():
         self.port = 19734
         self.url = "http://localhost:%d/json_rpc" % self.port
         self.app = app
-        
+
     def send_request(self, rpc_input):
         req = RPCRequest(rpc_input, self.url, self.app)
         req.start()
         return req.get_result()
-        
+
     def get_info(self):
         rpc_input = {"method": "get_info"}
         return self.send_request(rpc_input)
-    
-    
+
+
 class WalletRPCRequest():
     def __init__(self, app, user_agent):
         self.port = 19736
         self.url = "http://localhost:%d/json_rpc" % self.port
         self.app = app
         self.user_agent = user_agent
-        
+
     def send_request(self, rpc_input):
         req = RPCRequest(rpc_input, self.url, self.app, self.user_agent)
         req.start()
         return req.get_result()
-        
+
     def query_key(self, key_type="mnemonic"):
         rpc_input = {"method":"query_key", "params": {"key_type": key_type}}
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
             return res['key']
         return res['status']
-        
+
     def get_address(self):
         rpc_input = {"method":"getaddress"}
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
             return res['address']
         return res['status']
-    
+
     def get_balance(self):
         rpc_input = {"method":"getbalance"}
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
             return (res['balance'], res['unlocked_balance'])
         return (0, 0)
-    
+
     def get_transfers(self, filter_by_height=False, min_height=0, max_height=0, tx_in=True, tx_out=True, tx_pending=False, tx_in_pool=False):
         rpc_input = {"method":"get_transfers"}
         params = {}
@@ -163,15 +163,15 @@ class WalletRPCRequest():
         params["pool"] = tx_in_pool
         rpc_input["params"] = params
         return self.send_request(rpc_input)
-    
+
     def rescan_spent(self):
         rpc_input = {"method": "rescan_spent"}
         return self.send_request(rpc_input)
-    
+
     def rescan_bc(self):
         rpc_input = {"method": "rescan_blockchain"}
         return self.send_request(rpc_input)
-    
+
     def transfer_split(self, amount, address, payment_id, priority, mixin):
         rpc_input = {"method": "transfer_split"}
         params = {"destinations": [{"amount" : amount, "address": address}],
@@ -179,26 +179,26 @@ class WalletRPCRequest():
                   "mixin": mixin}
         if payment_id:
             params["payment_id"] = payment_id
-        
+
         rpc_input["params"] = params
         return self.send_request(rpc_input)
-    
+
     def set_tx_notes(self, txids, notes):
         rpc_input = {"method": "set_tx_notes"}
         params = {"txids": txids, "notes": notes}
         rpc_input["params"] = params
         return self.send_request(rpc_input)
-    
+
     def make_integrated_address(self, payment_id):
         rpc_input = {"method": "make_integrated_address"}
         params = {"payment_id": payment_id}
         rpc_input["params"] = params
         return self.send_request(rpc_input)
-    
+
     def get_address_book(self):
         rpc_input = {"method": "get_address_book"}
         return self.send_request(rpc_input)
-    
+
     def add_address_book(self, address, payment_id, desc):
         rpc_input = {"method": "add_address_book"}
         params = {"address": address}
@@ -208,14 +208,13 @@ class WalletRPCRequest():
             params["description"] = desc
         rpc_input["params"] = params
         return self.send_request(rpc_input)
-    
+
     def delete_address_book(self, index):
         rpc_input = {"method": "delete_address_book"}
         params = {"index": index}
         rpc_input["params"] = params
         return self.send_request(rpc_input)
-        
+
     def stop_wallet(self):
         rpc_input = {"method":"stop_wallet"}
         return self.send_request(rpc_input)
-        
