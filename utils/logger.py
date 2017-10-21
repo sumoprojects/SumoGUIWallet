@@ -38,8 +38,8 @@ def log(message, level, process_name=None):
         log_file = settings.log_file
     else:
         log_file = os.path.join(settings.DATA_DIR, 'logs', "%s.log" % process_name)
-
-    ensureDir(log_file)
+    print ("ensureDir")
+    #ensureDir(log_file)
 
     logger = get_logger(log_file, maxbytes=2*1024*1024) # maxbytes = 2MB
 

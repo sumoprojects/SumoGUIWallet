@@ -48,7 +48,7 @@ class RPCRequest(Thread):
         if user_agent is not None:
             self.headers.update({"User-Agent": user_agent})
 
-        self.response_queue = Queue(1)
+        self.response_queue = queue.Queue(1)
         self.daemon = True
 
 

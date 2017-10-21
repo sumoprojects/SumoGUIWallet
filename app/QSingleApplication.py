@@ -8,7 +8,8 @@ of appliaction
 
 from __future__ import print_function
 import sys, os
-import PyQt5.QtGui
+
+
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QIODevice, QTimer
 from PyQt5.QtNetwork import QLocalServer, QLocalSocket

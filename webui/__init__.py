@@ -15,12 +15,15 @@ import PyQt5
 from time import sleep
 
 from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QApplication, QMainWindow, \
+            QSystemTrayIcon, QMenu, QAction, QMessageBox, QFileDialog, \
+            QInputDialog, QLineEdit
 from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal
 
 import PyQt5.QtCore as qt_core
 
 import PyQt5.QtWebKit as web_core
+from PyQt5.QtWebKitWidgets import QWebView
 from PyQt5.QtCore import QTimer
 
 
@@ -38,7 +41,7 @@ from html import index, newwallet
 class BaseWebUI(QMainWindow):
     def __init__(self, html, app, hub, window_size, debug=False):
         print ("making window")
-        QApplication(sys.argv)
+
 
         QMainWindow.__init__(self)
         self.app = app
@@ -50,7 +53,7 @@ class BaseWebUI(QMainWindow):
         print ("made window")
 
         self.is_first_load = True
-        self.view = web_core.QWebView(self)
+        self.view = PyQt5.QtWebKitWidgets.QWebView(self)
 
         if not self.debug:
             self.view.setContextMenuPolicy(qt_core.Qt.NoContextMenu)

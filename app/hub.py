@@ -17,14 +17,16 @@ import re
 import hashlib
 from shutil import copy2
 
-from PySide.QtGui import QApplication, QMessageBox, QFileDialog, \
-            QInputDialog, QLineEdit
-from PySide.QtCore import QObject, Slot, Signal
+from PyQt5 import QtGui
+from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal
+
+from PyQt5.QtWidgets import QApplication, QLineEdit, QInputDialog, QMessageBox, QFileDialog
 
 from utils.common import print_money, print_money2, readFile
 
 from settings import APP_NAME, VERSION, DATA_DIR, COIN, makeDir, seed_languages
 from utils.logger import log, LEVEL_ERROR, LEVEL_INFO
+
 
 # from utils.notify import Notify
 # from sys import stderr
@@ -41,16 +43,21 @@ password_regex = re.compile(r"^([a-zA-Z0-9!@#$%^&*]{6,128})$")
 class Hub(QObject):
     def __init__(self, app):
         super(Hub, self).__init__()
+        print ("Hub")
         self.app = app
+        print ("app set")
 
 
     def setUI(self, ui):
+        print ("setUI")
         self.ui = ui
+        print("UI set")
 
     def setNewWalletUI(self, new_wallet_ui):
+        print("set new wallet")
         self.new_wallet_ui = new_wallet_ui
-
-    @Slot()
+        print("done")
+    @pyqtSlot()
     def import_wallet(self):
         dlg = QFileDialog(self.new_wallet_ui, "Select Import Wallet File")
         dlg.setFileMode(QFileDialog.ExistingFile)
@@ -145,7 +152,7 @@ class Hub(QObject):
         return True
 
 
-    @Slot()
+    @pyqtSlot()
     def close_new_wallet_dialog(self):
         log("Closing new wallet dialog...", LEVEL_INFO)
         self.ui.new_wallet_ui.close();
@@ -154,7 +161,7 @@ class Hub(QObject):
             self.ui.show_wallet();
 
 
-    @Slot(str)
+    @pyqtSlot(str)
     def create_new_wallet(self, mnemonic_seed=u''):
         wallet_password = None
         wallet_filepath = ""
@@ -283,7 +290,7 @@ class Hub(QObject):
         else:
             self.on_new_wallet_ui_reset_event.emit()
 
-    @Slot()
+    @pyqtSlot()
     def rescan_spent(self):
         self.app_process_events()
         self.ui.wallet_rpc_manager.rpc_request.rescan_spent()
@@ -297,7 +304,7 @@ class Hub(QObject):
         self.on_wallet_rescan_spent_completed_event.emit()
 
 
-    @Slot()
+    @pyqtSlot()
     def rescan_bc(self):
         result = QMessageBox.question(self.ui, "Rescan Blockchain", \
                                   "Rescanning blockchain can take a lot of time.<br><br>Are you sure to proceed?", \
@@ -318,7 +325,7 @@ class Hub(QObject):
         self.on_wallet_rescan_bc_completed_event.emit()
 
 
-    @Slot(float, str, str, int, int, str, bool)
+    @pyqtSlot(float, str, str, int, int, str, bool)
     def send_tx(self, amount, address, payment_id, priority, mixin, tx_desc, save_address):
         if not payment_id and not address.startswith("Sumi"):
             result = QMessageBox.question(self.ui, "Sending Coins Without Payment ID?", \
@@ -394,18 +401,18 @@ class Hub(QObject):
                                             "Address (and payment ID) saved to address book.")
 
 
-    @Slot(int)
+    @pyqtSlot(int)
     def generate_payment_id(self, hex_length=16):
         payment_id = binascii.b2a_hex(os.urandom(hex_length/2))
         integrated_address = self.ui.wallet_rpc_manager.rpc_request.make_integrated_address(payment_id)["integrated_address"]
         self.on_generate_payment_id_event.emit(payment_id, integrated_address);
 
 
-    @Slot(str)
+    @pyqtSlot(str)
     def copy_text(self, text):
         QApplication.clipboard().setText(text)
 
-    @Slot()
+    @pyqtSlot()
     def load_address_book(self):
         if not self.ui.wallet_info.wallet_address_book:
             address_book = []
@@ -416,7 +423,7 @@ class Hub(QObject):
 
         self.on_load_address_book_completed_event.emit( json.dumps(self.ui.wallet_info.wallet_address_book) )
 
-    @Slot(int)
+    @pyqtSlot(int)
     def delete_address_book(self, index):
         result = QMessageBox.question(self.ui, "Delete Address Book Entry", \
                                       "Are you sure to delete this address?", \
@@ -467,7 +474,7 @@ class Hub(QObject):
                         return tx
         return None
 
-    @Slot(int, str)
+    @pyqtSlot(int, str)
     def view_tx_detail(self, height, tx_id):
         if height > 0:
             transfers = self.ui.wallet_rpc_manager.rpc_request.get_transfers(filter_by_height=True, min_height=height-1, max_height=height)
@@ -483,7 +490,7 @@ class Hub(QObject):
         self.on_tx_detail_found_event.emit( json.dumps(tx) )
 
 
-    @Slot(int)
+    @pyqtSlot(int)
     def load_tx_history(self, current_page=0):
         if current_page <= 0: current_page = 1
         txs_per_page = 10
@@ -508,7 +515,7 @@ class Hub(QObject):
         self.on_load_tx_history_completed_event.emit( json.dumps(ret) );
 
 
-    @Slot()
+    @pyqtSlot()
     def open_new_wallet(self):
         result = QMessageBox.question(self.ui, "Open/Create New Wallet", \
                                       "<b>This will close current wallet and open/create new wallet!</b><br><br>Are you sure to continue?", \
@@ -528,7 +535,7 @@ class Hub(QObject):
         self.ui.show_new_wallet_ui()
 
 
-    @Slot(str)
+    @pyqtSlot(str)
     def view_wallet_key(self, key_type):
         wallet_password, result = self._custom_input_dialog(self.ui, \
                         "Wallet Password", "Please enter wallet password:", QLineEdit.Password)
@@ -553,23 +560,23 @@ class Hub(QObject):
         self.on_view_wallet_key_completed_event.emit(title, ret)
 
 
-    @Slot(int)
+    @pyqtSlot(int)
     def set_daemon_log_level(self, level):
         # save log level
         self.ui.app_settings.settings['daemon']['log_level'] = level
         self.ui.app_settings.save()
 
 
-    @Slot(int)
+    @pyqtSlot(int)
     def set_block_sync_size(self, sync_size):
         self.ui.app_settings.settings['daemon']['block_sync_size'] = sync_size
         self.ui.app_settings.save()
 
-    @Slot()
+    @pyqtSlot()
     def load_app_settings(self):
         self.on_load_app_settings_completed_event.emit( json.dumps(self.ui.app_settings.settings) )
 
-    @Slot()
+    @pyqtSlot()
     def about_app(self):
         self.ui.about()
 
@@ -622,20 +629,20 @@ class Hub(QObject):
         self.on_new_wallet_show_info_event.emit(json.dumps(wallet_info))
 
 
-    on_new_wallet_show_info_event = Signal(str)
-    on_new_wallet_show_progress_event = Signal(str)
-    on_new_wallet_ui_reset_event = Signal()
-    on_new_wallet_update_processed_block_height_event = Signal(str)
+    on_new_wallet_show_info_event = pyqtSignal(str)
+    on_new_wallet_show_progress_event = pyqtSignal(str)
+    on_new_wallet_ui_reset_event = pyqtSignal()
+    on_new_wallet_update_processed_block_height_event = pyqtSignal(str)
 
-    on_daemon_update_status_event = Signal(str)
-    on_main_wallet_ui_reset_event = Signal()
-    on_wallet_update_info_event = Signal(str)
-    on_wallet_rescan_spent_completed_event = Signal()
-    on_wallet_rescan_bc_completed_event = Signal()
-    on_wallet_send_tx_completed_event = Signal(str)
-    on_generate_payment_id_event = Signal(str, str)
-    on_load_address_book_completed_event = Signal(str)
-    on_tx_detail_found_event = Signal(str)
-    on_load_tx_history_completed_event = Signal(str)
-    on_view_wallet_key_completed_event = Signal(str, str)
-    on_load_app_settings_completed_event = Signal(str)
+    on_daemon_update_status_event = pyqtSignal(str)
+    on_main_wallet_ui_reset_event = pyqtSignal()
+    on_wallet_update_info_event = pyqtSignal(str)
+    on_wallet_rescan_spent_completed_event = pyqtSignal()
+    on_wallet_rescan_bc_completed_event = pyqtSignal()
+    on_wallet_send_tx_completed_event = pyqtSignal(str)
+    on_generate_payment_id_event = pyqtSignal(str, str)
+    on_load_address_book_completed_event = pyqtSignal(str)
+    on_tx_detail_found_event = pyqtSignal(str)
+    on_load_tx_history_completed_event = pyqtSignal(str)
+    on_view_wallet_key_completed_event = pyqtSignal(str, str)
+    on_load_app_settings_completed_event = pyqtSignal(str)
