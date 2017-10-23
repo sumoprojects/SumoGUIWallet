@@ -52,13 +52,16 @@ class ProcessManager(Thread):
     def stop(self):
         if self.is_proc_running():
             self.send_command('exit')
-            sleep(2)
-            self.send_command('exit')
-            self.proc.stdin.close()
+            #self.proc.stdin.close()
             counter = 0
             while True:
                 if self.is_proc_running():
                     if counter < 10:
+                        if counter == 2:
+                            try:
+                                self.send_command('exit')
+                            except:
+                                pass
                         sleep(1)
                         counter += 1
                     else:
