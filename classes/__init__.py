@@ -85,7 +85,7 @@ class AppSettings():
     settings = {
         "daemon": {
             "log_level": 0,
-            "block_sync_size": 50
+            "block_sync_size": 10
         },
         
         "blockchain": {
