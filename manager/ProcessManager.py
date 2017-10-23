@@ -52,6 +52,8 @@ class ProcessManager(Thread):
     def stop(self):
         if self.is_proc_running():
             self.send_command('exit')
+            sleep(2)
+            self.send_command('exit')
             self.proc.stdin.close()
             counter = 0
             while True:
@@ -72,24 +74,24 @@ class ProcessManager(Thread):
     
 
 class SumokoindManager(ProcessManager):
-    def __init__(self, resources_path, log_level=0, block_sync_size=50):
+    def __init__(self, resources_path, log_level=0, block_sync_size=10):
         proc_args = u'%s/bin/sumokoind --log-level %d --block-sync-size %d' % (resources_path, log_level, block_sync_size)
         ProcessManager.__init__(self, proc_args, "sumokoind")
         self.synced = Event()
         self.stopped = Event()
         
     def run(self):
-        synced_str = "You are now synchronized with the network"
+#         synced_str = "You are now synchronized with the network"
         err_str = "ERROR"
         for line in iter(self.proc.stdout.readline, b''):
-            if not self.synced.is_set() and line.startswith(synced_str):
-                self.synced.set()
-                log(synced_str, LEVEL_INFO, self.proc_name)
-            elif err_str in line:
+#             if not self.synced.is_set() and line.startswith(synced_str):
+#                 self.synced.set()
+#                 log(synced_str, LEVEL_INFO, self.proc_name)
+            if err_str in line:
                 self.last_error = line.rstrip()
                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
             else:
-                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
+                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_INFO, self.proc_name)
         
         if not self.proc.stdout.closed:
             self.proc.stdout.close()

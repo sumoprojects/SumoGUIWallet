@@ -1,7 +1,5 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 ## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 '''
 Hub is a communication medium between Python codes and web UI
@@ -15,7 +13,9 @@ import uuid
 import json
 import re
 import hashlib
+import webbrowser
 from shutil import copy2
+
 
 from PySide.QtGui import QApplication, QMessageBox, QFileDialog, \
             QInputDialog, QLineEdit
@@ -37,6 +37,8 @@ wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
         
 password_regex = re.compile(r"^([a-zA-Z0-9!@#$%^&*]{6,128})$")
+
+from webui import LogViewer
 
 class Hub(QObject):
     def __init__(self, app):
@@ -573,6 +575,25 @@ class Hub(QObject):
     def about_app(self):
         self.ui.about()
         
+    @Slot(str)
+    def open_link(self, link):
+        webbrowser.open(link)
+        
+    @Slot()
+    def restart_daemon(self):
+        self.app_process_events(1)
+        self.ui.sumokoind_daemon_manager.stop()
+        self.ui.start_deamon()
+        self.app_process_events(5)
+        self.on_restart_daemon_completed_event.emit()
+        
+    
+    @Slot()
+    def view_daemon_log(self):
+        log_file = os.path.join(DATA_DIR, 'logs', "sumokoind.log")
+        log_dialog = LogViewer(parent=self.ui, log_file=log_file)
+        log_dialog.load_log()
+        
                 
     def update_daemon_status(self, status):
         self.on_daemon_update_status_event.emit(status)
@@ -639,3 +660,4 @@ class Hub(QObject):
     on_load_tx_history_completed_event = Signal(str)
     on_view_wallet_key_completed_event = Signal(str, str)
     on_load_app_settings_completed_event = Signal(str)
+    on_restart_daemon_completed_event = Signal()

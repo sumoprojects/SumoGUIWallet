@@ -131,17 +131,25 @@ html ="""
                 font-weight: bold;
             }
             
-            .tx-list.tx-out, .tx-list.tx-in, .tx-list.tx-pool, .tx-list.tx-pending{
+            .tx-list a{
+                cursor: pointer;
+            }
+            
+            .tx-list.tx-out, .tx-list.tx-in, .tx-list.tx-pool, .tx-list.tx-pending, .tx-list.tx-out a, .tx-list.tx-out a:active, .tx-list.tx-out a:focus{
                 color: #c7254e;
                 margin-bottom: 0;
             }
             
-            .tx-list.tx-in{
+            .tx-list.tx-in, .tx-list.tx-in a, .tx-list.tx-in a:active, .tx-list.tx-in a:focus{
                 color: green;
             }
             
-            .tx-list.tx-pool, .tx-list.tx-pending{
+            .tx-list.tx-pool, .tx-list.tx-pending, .tx-list.tx-pending a, .tx-list.tx-pending a:active, .tx-list.tx-pending a:focus, .tx-list.tx-pool a, .tx-list.tx-pool a:active, .tx-list.tx-pool a:focus{
                 color: orange;
+            }
+            
+            .tx-list a:hover{
+                color: #337AB7;
             }
             
             .tx-list.txid{
@@ -444,7 +452,7 @@ html ="""
                                                        });
                     
                     hide_progress();
-                    show_app_dialog(tx_rendered);
+                    show_app_dialog('<div class="copied">' + tx_rendered + '</div>');
                 });
                 
                 app_hub.on_load_tx_history_completed_event.connect(function(ret_json){
@@ -501,10 +509,14 @@ html ="""
                     if(ret){
                         var html = '<h5>' + title + '</h5>';
                         html += '<div class="form-group">';
-                        html +='<textarea class="form-control address-box" style="height:70px;font-size:95%;" readonly="readonly">' + ret + '</textarea>';
+                        html +='<textarea class="form-control address-box copied" style="height:70px;font-size:95%;" readonly="readonly">' + ret + '</textarea>';
                         html += '</div>';
                         show_app_dialog(html);
                     }
+                });
+                
+                app_hub.on_restart_daemon_completed_event.connect(function(){
+                    hide_progress();
                 });
             }
             
@@ -538,7 +550,7 @@ html ="""
                     if(sync_pct < 100){
                         progress_bar.addClass('progress-bar-striped')
                                                         .addClass('active');
-                        show_app_progress('Waiting for network synchronization... Be patient! This can take (very) long time...');
+                        //show_app_progress('Waiting for network synchronization... Be patient! This can take (very) long time...');
                     }
                     else{
                         progress_bar.removeClass('progress-bar-striped')
@@ -563,6 +575,8 @@ html ="""
                     
                     progress_bar.css("width", sync_pct + "%");
                     progress_bar.attr("aria-valuenow", sync_pct);
+                    
+                    disable_buttons(sync_pct < 100);
                 }, 1);
                 
             }
@@ -612,15 +626,7 @@ html ="""
                     balance_span.css("color", sync_pct < 100 ? "#ccc" : "#666");
                     unlocked_balance_span.css("color", sync_pct < 100 ? "#ccc" : "#666");
                     
-                    if(sync_pct == 100){
-                        hide_app_progress();
-                    }
-                    
-                    rescan_spent_btn.disable(sync_pct < 100);
-                    rescan_bc_btn.disable(sync_pct < 100);
-                    btn_send_tx.disable(sync_pct < 100);
-                    btn_fill_all_money.disable(sync_pct < 100);
-                    
+                    disable_buttons(sync_pct < 100);
                                         
                     if(current_balance != wallet_info['balance']){
                         balance_span.delay(100).fadeOut(function(){
@@ -641,9 +647,18 @@ html ="""
                         receive_address.val(current_address);
                         $('#receive_address_qrcode').html('');
                         $('#receive_address_qrcode').qrcode({width: 220,height: 220, text: current_address});
-                    } 
+                    }
+                    
+                    hide_app_progress();
                     
                 }, 1);
+            }
+            
+            function disable_buttons(s){
+                rescan_spent_btn.disable(s);
+                rescan_bc_btn.disable(s);
+                btn_send_tx.disable(s);
+                btn_fill_all_money.disable(s);
             }
             
             function rescan_spent(){
@@ -798,6 +813,7 @@ html ="""
             function show_app_dialog(msg, title){
                 $('#app_model_body').css("color", "#666"); 
                 $('#app_model_body').html(msg);
+                $('#btn_copy').text('Copy');
                 $('#app_modal_dialog').modal('show');
             }
             
@@ -827,6 +843,22 @@ html ="""
             
             function hide_progress(){
                 $('#sending_modal_progress').modal('hide');
+            }
+            
+            function open_link(link){
+                app_hub.open_link(link);
+                return false;
+            }
+            
+            function restart_daemon(){
+                show_app_progress("Restarting daemon...");
+                app_hub.restart_daemon();
+                return false;
+            }
+            
+            function copy_dialog_content(){
+                app_hub.copy_text( $('#app_model_body .copied').text() );
+                $('#btn_copy').text('Copied');
             }
  
             $(document).ready(function(){
@@ -964,90 +996,92 @@ html ="""
                 <div id="send_tab" class="tab-pane fade">
                     <h3>SEND</h3>
                     <form id="form_send_tx" class="form-horizontal">
-                        <div class="form-group">
-                            <div class="col-sm-12">
-                                <label for="send_amount" class="col-xs-2 control-label">Amount</label>
-                                <div class="col-xs-10 input-group" style="padding-left: 15px;padding-right: 15px;">
-                                    <input id="send_amount" type="text" class="form-control" placeholder="0.0" maxlength="255"/>
-                                    <span class="input-group-btn">
-                                        <button id="btn_fill_all_money" class="btn btn-primary btn-sm"  style="text-transform: none" type="button" tabindex="-1" onclick="fill_all_money()" disabled>All coins</button>
-                                    </span>
+                        <fieldset>
+                            <div class="form-group">
+                                <div class="col-sm-12">
+                                    <label for="send_amount" class="col-xs-2 control-label">Amount</label>
+                                    <div class="col-xs-10 input-group" style="padding-left: 15px;padding-right: 15px;">
+                                        <input id="send_amount" type="text" class="form-control" placeholder="0.0" maxlength="255"/>
+                                        <span class="input-group-btn">
+                                            <button id="btn_fill_all_money" class="btn btn-primary btn-sm"  style="text-transform: none" type="button" tabindex="-1" onclick="fill_all_money()" disabled>All coins</button>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-12">
-                                <label for="send_address" class="col-xs-2 control-label">Address</label>
-                                <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
-                                    <input id="send_address" type="text" class="form-control"  placeholder="Paste receiving address here..." maxlength="110"/>
-                                    <span class="input-group-btn">
-                                        <button class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="show_address_book()">
-                                            <i class="fa fa-address-book"></i> Address book...
-                                        </button>
-                                    </span>
+                            <div class="form-group">
+                                <div class="col-sm-12">
+                                    <label for="send_address" class="col-xs-2 control-label">Address</label>
+                                    <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
+                                        <input id="send_address" type="text" class="form-control"  placeholder="Paste receiving address here..." maxlength="110"/>
+                                        <span class="input-group-btn">
+                                            <button class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="show_address_book()">
+                                                <i class="fa fa-address-book"></i> Address book...
+                                            </button>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-12">
-                                <label for="send_payment_id" class="col-xs-2 control-label">Payment ID</label>
-                                <div class="col-xs-10">
-                                    <input id="send_payment_id" type="text" class="form-control"  placeholder="Paste payment ID here (optional)..." maxlength="64"/>
+                            <div class="form-group">
+                                <div class="col-sm-12">
+                                    <label for="send_payment_id" class="col-xs-2 control-label">Payment ID</label>
+                                    <div class="col-xs-10">
+                                        <input id="send_payment_id" type="text" class="form-control"  placeholder="Paste payment ID here (optional)..." maxlength="64"/>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-12">
-                                <label for="send_tx_desc" class="col-xs-2 control-label">Description</label>
-                                <div class="col-xs-10">
-                                    <input id="send_tx_desc" type="text" class="form-control"  placeholder="Tx description, saved to local wallet history (optional)..." maxlength="255"/>
+                            <div class="form-group">
+                                <div class="col-sm-12">
+                                    <label for="send_tx_desc" class="col-xs-2 control-label">Description</label>
+                                    <div class="col-xs-10">
+                                        <input id="send_tx_desc" type="text" class="form-control"  placeholder="Tx description, saved to local wallet history (optional)..." maxlength="255"/>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-6">
-                                <label for="send_mixins" class="col-xs-4 control-label">Privacy <sup>1</sup></label>
-                                <div class="col-xs-8">
-                                    <select id="send_mixins" class="form-control">
-                                      <option value="12" selected>12 mixins (default)</option>
-                                      <option value="15">15 mixins</option>
-                                      <option value="18">18 mixins</option>
-                                      <option value="24">24 mixins</option>
-                                      <option value="36">36 mixins</option>
-                                      <option value="48">48 mixins</option>
-                                      <option value="60">60 mixins</option>
-                                    </select>
+                            <div class="form-group">
+                                <div class="col-sm-6">
+                                    <label for="send_mixins" class="col-xs-4 control-label">Privacy <sup>1</sup></label>
+                                    <div class="col-xs-8">
+                                        <select id="send_mixins" class="form-control">
+                                          <option value="12" selected>12 mixins (default)</option>
+                                          <option value="15">15 mixins</option>
+                                          <option value="18">18 mixins</option>
+                                          <option value="24">24 mixins</option>
+                                          <option value="36">36 mixins</option>
+                                          <option value="48">48 mixins</option>
+                                          <option value="60">60 mixins</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label for="send_priority" class="col-xs-4 control-label">Priority <sup>2</sup></label>
+                                    <div class="col-xs-8">
+                                        <select id="send_priority" class="form-control">
+                                          <option value="1" selected>Normal (x1 fee)</option>
+                                          <option value="2">High (x2 fee)</option>
+                                          <option value="4">Higher (x4 fee)</option>
+                                          <option value="20">Elevated (x20 fee)</option>
+                                          <option value="166">Forceful (x166 fee)</option>
+                                        </select>
+                                       <!--<input id="send_fee_level_slider" type="text"/>--> 
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-sm-6">
-                                <label for="send_priority" class="col-xs-4 control-label">Priority <sup>2</sup></label>
-                                <div class="col-xs-8">
-                                    <select id="send_priority" class="form-control">
-                                      <option value="1" selected>Normal (x1 fee)</option>
-                                      <option value="2">High (x2 fee)</option>
-                                      <option value="4">Higher (x4 fee)</option>
-                                      <option value="20">Elevated (x20 fee)</option>
-                                      <option value="166">Forceful (x166 fee)</option>
-                                    </select>
-                                   <!--<input id="send_fee_level_slider" type="text"/>--> 
+                             <div class="form-group">
+                                <div class="col-sm-12">
+                                    <label class="col-xs-2 control-label sr-only">&nbsp;</label>
+                                    <div class="col-xs-10">
+                                        <input id="checkbox_save_address" type="checkbox" /> <label for="checkbox_save_address">Save address (with payment id) to address book</label>
+                                        <label style="color:#999"><small>1. Higher mixin (ringsize) means higher transaction cost, using default mixin# (12) is recommended</small></label>
+                                        <label style="color:#999"><small>2. Only choose higher priority when there are many transactions in tx pool or "Normal" works just fine</small></label>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                         <div class="form-group">
-                            <div class="col-sm-12">
-                                <label class="col-xs-2 control-label sr-only">&nbsp;</label>
-                                <div class="col-xs-10">
-                                    <input id="checkbox_save_address" type="checkbox" /> <label for="checkbox_save_address">Save address (with payment id) to address book</label>
-                                    <label style="color:#999"><small>1. Higher mixin (ringsize) means higher transaction cost, using default mixin# (12) is recommended</small></label>
-                                    <label style="color:#999"><small>2. Only choose higher priority when there are many transactions in tx pool or "Normal" works just fine</small></label>
+                            <div class="form-group">
+                                <div class="col-sm-12" style="text-align: center">
+                                    <button id="btn_send_tx" type="button" class="btn btn-success" onclick="send_tx()" disabled><i class="fa fa-send"></i> Send</button>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-12" style="text-align: center">
-                                <button id="btn_send_tx" type="button" class="btn btn-success" onclick="send_tx()" disabled><i class="fa fa-send"></i> Send</button>
-                            </div>
-                        </div>
+                        </fieldset>
                     </form>
                 </div>
                 <div id="tx_history_tab" class="tab-pane fade">
@@ -1139,47 +1173,49 @@ html ="""
                                         <div class="col-xs-8">
                                             <div class="radio">
                                               <label>
-                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_10" value="10" onclick="set_block_sync_size(10)">
-                                                10 (for slower network/lower RAM)
+                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_10" value="10" onclick="set_block_sync_size(10)" checked="">
+                                                10 (default, for slow network)
                                               </label>
                                             </div>
                                             <div class="radio">
                                               <label>
                                                 <input type="radio" name="daemon_block_sync_size" id="block_sync_size_20" value="20" onclick="set_block_sync_size(20)">
-                                                20 (for slow network/low RAM)
+                                                20 (for normal network)
                                               </label>
                                             </div>
                                             <div class="radio">
                                               <label>
-                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_50" value="50" checked="" onclick="set_block_sync_size(50)">
-                                                50 (default)
+                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_50" value="50" onclick="set_block_sync_size(50)">
+                                                50 (for good network)
                                               </label>
                                             </div>
                                             <div class="radio">
                                               <label>
                                                 <input type="radio" name="daemon_block_sync_size" id="block_sync_size_100" value="100" onclick="set_block_sync_size(100)">
-                                                100 (for good network/high RAM)
+                                                100 (for better network)
                                               </label>
                                             </div>
                                             <div class="radio">
                                               <label>
                                                 <input type="radio" name="daemon_block_sync_size" id="block_sync_size_200" value="200" onclick="set_block_sync_size(200)">
-                                                200 (for better network/higher RAM)
+                                                200 (for great network)
                                               </label>
                                             </div>
                                         </div>
                                     </div>
                                 </form>
                             </div>
-                            <div class="col-sm-12" style="margin-top: 10px;">
-                                <label style="color:#999;font-size:90%">1. Daemon settings will come effective next time you start wallet</label><br/>
-                                <label style="color:#999;font-size:90%">2. Daemon log-level above [0] shoud be set only for debugging purpose</label>
+                            <div class="col-sm-12 wallet-settings" style="margin-top: 10px; text-align:center;">
+                                <!--<label style="color:#999;font-size:90%">1. Daemon settings will come effective next time you start wallet</label><br/>
+                                <label style="color:#999;font-size:90%">2. Daemon log-level above [0] shoud be set only for debugging purpose</label>-->
+                                <button id="btn_restart_daemon" type="button" class="btn btn-primary" onclick="restart_daemon()"><i class="fa fa-refresh"></i> Restart Daemon</button>
+                                <button id="btn_view_log" type="button" class="btn btn-primary" onclick="app_hub.view_daemon_log()"><i class="fa fa-file"></i> View Log...</button>
                             </div>
                         </div>
                     </div>
                     <hr style="margin-top:10px;margin-bottom:10px;">
                     <div class="row">
-                        <div class="col-sm-12" style="text-align: center">
+                        <div class="col-sm-12" style="margin-top: 10px;text-align: center">
                             <button id="btn_about" type="button" class="btn btn-primary" onclick="about_app()"><i class="fa fa-user"></i> About...</button>
                         </div>
                     </div>
@@ -1198,6 +1234,7 @@ html ="""
                 <div class="modal-content">
                     <div class="modal-body" id="app_model_body"></div>
                     <div class="modal-footer">
+                        <button id="btn_copy" type="button" class="btn btn-primary" onclick="copy_dialog_content()">Copy</button>
                         <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
                     </div>
                 </div>
@@ -1229,7 +1266,7 @@ html ="""
         <script id="recent_tx_row_templ" type="x-tmpl-mustache">
             <div class="col-sm-12">
                 <div class="col-xs-10" style="padding-right:0">
-                    <p class="tx-list tx-{{cls_in_out}}"><i class="fa fa-{{ tx_fa_icon }}"></i> ({{tx_direction}}) <span class="tx-list txid">{{ tx_id }}</span></p>
+                    <p class="tx-list tx-{{cls_in_out}}"><i class="fa fa-{{ tx_fa_icon }}"></i> ({{tx_direction}}) <span class="tx-list txid"><a href="javascript:open_link('https://explorer.sumokoin.com/tx/{{ tx_id }}')" title="View on blockchain explorer">{{ tx_id }}</a></span></p>
                     Payment ID: <span class="tx-list tx-payment-id">{{ tx_payment_id }}</span><br/>
                     Height: <span class="tx-list tx-height">{{ tx_height }}</span>  Date: <span class="tx-list tx-date">{{ tx_date }}</span> Time: <span class="tx-list tx-time">{{ tx_time }}</span> Status: <span class="tx-list tx-status">{{ tx_status }}</span><br/>
                     <p style="font-size:140%">Amount: <span class="tx-list tx-{{cls_in_out}} tx-amount {{tx_lock_cls}}">{{{tx_lock_icon}}}{{ tx_amount }}</span> <span class="{{ tx_fee_hide }}">Fee:</span> <span class="tx-list tx-{{cls_in_out}} tx-fee {{ tx_fee_hide }}">{{ tx_fee }}</span></p> 
@@ -1243,7 +1280,7 @@ html ="""
         
         <script id="tx_detail_templ" type="x-tmpl-mustache">
             <p class="tx-list tx-{{cls_in_out}}" style="font-size: 90%"><i class="fa fa-{{ tx_fa_icon }}"></i> {{tx_direction}}<br>
-                <span class="tx-list txid">{{ tx_id }}</span>
+                <span class="tx-list txid"><a href="javascript:open_link('https://explorer.sumokoin.com/tx/{{ tx_id }}')" title="View on blockchain explorer">{{ tx_id }}</a></span>
             </p>
             <ul style="font-size: 90%">
                 <li>Payment ID: <span class="tx-list tx-payment-id">{{ tx_payment_id }}</span></li>
