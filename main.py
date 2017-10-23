@@ -80,7 +80,6 @@ def main():
                 <br><br>This could be a result of unknown (maybe, malicious) action<br> to wallet code files.""")
         app.quit()
     else:
-        print ("open GUI")
         hub = Hub(app=app)
         ui = MainWebUI(app=app, hub=hub, debug=False)
         hub.setUI(ui)

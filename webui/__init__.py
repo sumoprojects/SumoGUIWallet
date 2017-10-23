@@ -40,8 +40,6 @@ from html import index, newwallet
 
 class BaseWebUI(QMainWindow):
     def __init__(self, html, app, hub, window_size, debug=False):
-        print ("making window")
-
 
         QMainWindow.__init__(self)
         self.app = app
@@ -50,7 +48,6 @@ class BaseWebUI(QMainWindow):
         self.html = html
         self.url = "file:///" \
             + os.path.join(self.app.property("ResPath"), "www/").replace('\\', '/')
-        print ("made window")
 
         self.is_first_load = True
         self.view = PyQt5.QtWebKitWidgets.QWebView(self)

@@ -43,20 +43,14 @@ password_regex = re.compile(r"^([a-zA-Z0-9!@#$%^&*]{6,128})$")
 class Hub(QObject):
     def __init__(self, app):
         super(Hub, self).__init__()
-        print ("Hub")
         self.app = app
-        print ("app set")
-
 
     def setUI(self, ui):
-        print ("setUI")
         self.ui = ui
-        print("UI set")
 
     def setNewWalletUI(self, new_wallet_ui):
-        print("set new wallet")
         self.new_wallet_ui = new_wallet_ui
-        print("done")
+
     @pyqtSlot()
     def import_wallet(self):
         dlg = QFileDialog(self.new_wallet_ui, "Select Import Wallet File")

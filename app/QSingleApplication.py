@@ -20,6 +20,7 @@ DATA_DIR = makeDir(os.path.join(getSockDir(), 'SumokoinGUIWallet'))
 
 class QSingleApplication(QApplication):
     sock_file = 'sumokoin_wallet_sock'
+
     if sys.platform == 'win32':
         sock_file = "\\\\.\\pipe\\%s" % sock_file
     elif sys.platform == 'darwin':
@@ -30,10 +31,12 @@ class QSingleApplication(QApplication):
     def singleStart(self, appMain):
         self.appMain = appMain
         # Socket
+
         self.m_socket = QLocalSocket()
         self.m_socket.connected.connect(self.connectToExistingApp)
         self.m_socket.error.connect(lambda:self.startApplication(first_start=True))
         self.m_socket.connectToServer(self.sock_file, QIODevice.WriteOnly)
+
 
     def connectToExistingApp(self):
         # Quit application in 250 ms
