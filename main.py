@@ -40,7 +40,7 @@ def _check_file_integrity(app):
         if not os.path.exists(file_path):
             return False
         data = readFile(file_path)
-        print( file_path, hashlib.sha256(data).hexdigest() )
+        #print( file_path, hashlib.sha256(data).hexdigest() )
         if hashlib.sha256(data).hexdigest() != file_hash:
             return False
         
