@@ -15,6 +15,7 @@ from PyQt5.QtCore import QIODevice, QTimer
 from PyQt5.QtNetwork import QLocalServer, QLocalSocket
 
 from utils.common import getSockDir, makeDir
+from urllib.parse import urlparse
 
 DATA_DIR = makeDir(os.path.join(getSockDir(), 'SumokoinGUIWallet'))
 
@@ -34,8 +35,11 @@ class QSingleApplication(QApplication):
 
         self.m_socket = QLocalSocket()
         self.m_socket.connected.connect(self.connectToExistingApp)
-        self.m_socket.error.connect(lambda:self.startApplication(first_start=True))
-        self.m_socket.connectToServer(self.sock_file, QIODevice.WriteOnly)
+        self.m_socket.error.connect(lambda: self.startApplication(first_start=True))
+        try:
+            self.m_socket.connectToServer(self.sock_file, QIODevice.WriteOnly)
+        except Exception as err:
+            print (err, file=sys.stderr )
 
 
     def connectToExistingApp(self):
@@ -67,8 +71,12 @@ class QSingleApplication(QApplication):
 
     def getNewConnection(self):
         self.new_socket = self.m_server.nextPendingConnection()
-        self.new_socket.readyRead.connect(self.readSocket)
+        try:
+            self.new_socket.readyRead.connect(self.readSocket)
+        except Exception as err:
+            print (err, file=sys.stderr )
 
     def readSocket(self):
         f = self.new_socket.readLine()
-        self.appMain.processURLProtocol(str(f))
+        self.appMain.processURLProtocol(f)
+        print (appMain.processURLProtocol(f))

@@ -34,6 +34,7 @@ from utils.logger import log, LEVEL_ERROR, LEVEL_INFO
 tray_icon_tooltip = "%s v%d.%d" % (APP_NAME, VERSION[0], VERSION[1])
 
 from manager.ProcessManager import WalletCliManager
+from __future__ import unicode_literals
 
 wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
@@ -41,9 +42,46 @@ makeDir(wallet_dir_path)
 password_regex = re.compile(r"^([a-zA-Z0-9!@#$%^&*]{6,128})$")
 
 class Hub(QObject):
+
+    on_new_wallet_show_info_event = pyqtSignal(str)
+    on_new_wallet_show_progress_event = pyqtSignal(str)
+    on_new_wallet_ui_reset_event = pyqtSignal()
+    on_new_wallet_update_processed_block_height_event = pyqtSignal(str)
+    on_daemon_update_status_event = pyqtSignal(str)
+    on_main_wallet_ui_reset_event = pyqtSignal()
+    on_wallet_update_info_event = pyqtSignal(str)
+    on_wallet_rescan_spent_completed_event = pyqtSignal()
+    on_wallet_rescan_bc_completed_event = pyqtSignal()
+    on_wallet_send_tx_completed_event = pyqtSignal(float, str, str, int, int, str, bool)
+    on_generate_payment_id_event = pyqtSignal(str, str)
+    on_load_address_book_completed_event = pyqtSignal(str)
+    on_tx_detail_found_event = pyqtSignal(str)
+    on_load_tx_history_completed_event = pyqtSignal(str)
+    on_view_wallet_key_completed_event = pyqtSignal(str, str)
+    on_load_app_settings_completed_event = pyqtSignal(str)
+
     def __init__(self, app):
         super(Hub, self).__init__()
         self.app = app
+        self.connect_signals()
+
+    def connect_signals(self):
+        self.on_new_wallet_show_info_event.connect(self.copy_text)
+        self.on_new_wallet_show_progress_event.connect(self.copy_text)
+        self.on_new_wallet_show_progress_event.connect(self.copy_text)
+        self.on_new_wallet_ui_reset_event.connect(self.open_new_wallet)
+        self.on_new_wallet_update_processed_block_height_event.connect(self.copy_text)
+        self.on_daemon_update_status_event.connect(self.copy_text)
+        self.on_wallet_update_info_event.connect(self.copy_text)
+        self.on_wallet_rescan_spent_completed_event.connect(self._show_wallet_info)
+        self.on_wallet_rescan_bc_completed_event.connect(self._show_wallet_info)
+        self.on_wallet_send_tx_completed_event.connect(self.send_tx)
+        #self.on_generate_payment_id_event.connect(self.generate_payment_id)
+        self.on_load_address_book_completed_event.connect(self.copy_text)
+        self.on_tx_detail_found_event.connect(self.copy_text)
+        self.on_load_tx_history_completed_event.connect(self.copy_text)
+        self.on_view_wallet_key_completed_event.connect(self.copy_text)
+        self.on_load_app_settings_completed_event.connect(self.copy_text)
 
     def setUI(self, ui):
         self.ui = ui
@@ -155,7 +193,7 @@ class Hub(QObject):
             self.ui.show_wallet();
 
 
-    @pyqtSlot(str)
+    @pyqtSlot(unicode)
     def create_new_wallet(self, mnemonic_seed=u''):
         wallet_password = None
         wallet_filepath = ""
@@ -609,8 +647,9 @@ class Hub(QObject):
         text = dlg.textValue()
         return (text, result)
 
-
+    @pyqtSlot()
     def _show_wallet_info(self):
+
         wallet_rpc_request = self.ui.wallet_rpc_manager.rpc_request
         wallet_info = {}
         wallet_info['address'] = self.ui.wallet_info.wallet_address
@@ -621,22 +660,3 @@ class Hub(QObject):
         wallet_info['unlocked_balance'] = print_money(unlocked_balance)
 
         self.on_new_wallet_show_info_event.emit(json.dumps(wallet_info))
-
-
-    on_new_wallet_show_info_event = pyqtSignal(str)
-    on_new_wallet_show_progress_event = pyqtSignal(str)
-    on_new_wallet_ui_reset_event = pyqtSignal()
-    on_new_wallet_update_processed_block_height_event = pyqtSignal(str)
-
-    on_daemon_update_status_event = pyqtSignal(str)
-    on_main_wallet_ui_reset_event = pyqtSignal()
-    on_wallet_update_info_event = pyqtSignal(str)
-    on_wallet_rescan_spent_completed_event = pyqtSignal()
-    on_wallet_rescan_bc_completed_event = pyqtSignal()
-    on_wallet_send_tx_completed_event = pyqtSignal(str)
-    on_generate_payment_id_event = pyqtSignal(str, str)
-    on_load_address_book_completed_event = pyqtSignal(str)
-    on_tx_detail_found_event = pyqtSignal(str)
-    on_load_tx_history_completed_event = pyqtSignal(str)
-    on_view_wallet_key_completed_event = pyqtSignal(str, str)
-    on_load_app_settings_completed_event = pyqtSignal(str)

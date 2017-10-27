@@ -1,0 +1,52 @@
+
+#void slots
+import_wallet(void)
+close_new_wallet_dialog(void)
+load_app_settings(void)
+about_app(void)
+_show_wallet_info(void)
+rescan_spent(void)
+rescan_bc(void)
+load_address_book(void)
+open_new_wallet(void
+
+#void signals
+on_new_wallet_ui_reset_event(void)
+on_wallet_rescan_spent_completed_event(void)
+on_wallet_rescan_bc_completed_event(void)
+on_main_wallet_ui_reset_event(void)
+
+
+#str slots
+view_wallet_key(str)
+create_new_wallet(str)
+copy_text(str)
+
+#str signals
+on_new_wallet_show_info_event(json.dumps)
+on_new_wallet_show_progress_event('importing,creating,restoring wallet...')
+on_daemon_update_status_event(status)
+on_wallet_update_info_event(str)
+on_load_address_book_completed_event(str)
+on_tx_detail_found_event(str)
+on_load_tx_history_completed_event(str)
+on_view_wallet_key_completed_event(str)
+on_load_app_settings_completed_event(str)
+
+#int slots
+set_daemon_log_level(int)
+set_block_size(int)
+generate_payment_id(int)
+delete_address_book(int)
+load_tx_history(int)
+
+#int signals
+on_new_wallet_update_processed_block_height_event(int)
+
+#special
+send_tx(float,str,str,int,int,str,bool)
+view_tx_detail(int,str)
+
+#special_signals
+on_wallet_send_tx_completed_event(float......)
+on_generate_payment_id_event(str,str)

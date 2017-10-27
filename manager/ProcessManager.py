@@ -72,7 +72,7 @@ class ProcessManager(Thread):
 
 
 class SumokoindManager(ProcessManager):
-    def __init__(self, resources_path, log_level=0, block_sync_size=50):
+    def __init__(self, resources_path, log_level=0, block_sync_size=10):
         proc_args = u'%s/bin/sumokoind --log-level %d --block-sync-size %d' % (resources_path, log_level, block_sync_size)
         ProcessManager.__init__(self, proc_args, "sumokoind")
         self.synced = Event()
@@ -101,20 +101,19 @@ class WalletCliManager(ProcessManager):
 
     def __init__(self, resources_path, wallet_file_path, wallet_log_path, restore_wallet=False):
         if not restore_wallet:
-            wallet_args = u'%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' \
-                                                % (resources_path, wallet_file_path, wallet_log_path)
+            wallet_args = '%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' % (resources_path, wallet_file_path, wallet_log_path)
         else:
-            wallet_args = u'%s/bin/sumo-wallet-cli --log-file=%s --daemon-port 19735 --restore-deterministic-wallet' \
-                                                % (resources_path, wallet_log_path)
+            wallet_args = '%s/bin/sumo-wallet-cli --log-file=%s --daemon-port 19735 --restore-deterministic-wallet' % (resources_path, wallet_log_path)
         ProcessManager.__init__(self, wallet_args, "sumo-wallet-cli")
         self.ready = Event()
         self.last_error = ""
 
     def run(self):
+        print ("running WalletCliManager")
         is_ready_str = "Background refresh thread started"
         err_str = "Error:"
-        for line in iter(self.proc.stdout.readline, b""):
-            
+        for line in iter(self.proc.stdout.readline, ""):
+
             if not self.ready.is_set() and is_ready_str.encode() in line:
                 self.ready.set()
                 log("Wallet ready!", LEVEL_INFO, self.proc_name)

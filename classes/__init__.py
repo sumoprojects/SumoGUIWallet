@@ -96,7 +96,6 @@ class AppSettings():
     def __init__(self):
         self.app_settings_filepath = os.path.join(config_path, 'app_settings.json')
 
-
     def load(self):
         if os.path.exists(self.app_settings_filepath):
             try:
@@ -109,8 +108,7 @@ class AppSettings():
 
     def save(self):
         try:
-            writeFile(self.app_settings_filepath, \
-                json.dumps(self.settings, indent=2))
+            writeFile(self.app_settings_filepath, json.dumps(self.settings, indent=2).encode())
         except Exception as err:
             log("[AppSettings]>>> Save error:" + str(err), LEVEL_ERROR)
             return False
