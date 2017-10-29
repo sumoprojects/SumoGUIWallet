@@ -29,7 +29,9 @@ DETACHED_PROCESS = 0x00000008  # forcing the child to have no console at all
 class ProcessManager(Thread):
     def __init__(self, proc_args, proc_name=""):
         Thread.__init__(self)
-        args_array = proc_args.encode( sys.getfilesystemencoding() ).split()
+        args_array = proc_args.split(' ')
+        for i in range(len(args_array)):
+            args_array[i].encode()
         self.proc = Popen(args_array,
                           shell=False,
                           stdout=PIPE, stderr=STDOUT, stdin=PIPE,
@@ -79,10 +81,10 @@ class SumokoindManager(ProcessManager):
         self.stopped = Event()
 
     def run(self):
-        synced_str = "You are now synchronized with the network"
+        synced_str = b"You are now synchronized with the network"
         err_str = "ERROR"
         for line in iter(self.proc.stdout.readline, b''):
-            if not self.synced.is_set() and line.startswith(synced_str.encode()):
+            if not self.synced.is_set() and line.startswith(synced_str):
                 self.synced.set()
                 log(synced_str, LEVEL_INFO, self.proc_name)
             elif err_str.encode() in line:
@@ -101,27 +103,29 @@ class WalletCliManager(ProcessManager):
 
     def __init__(self, resources_path, wallet_file_path, wallet_log_path, restore_wallet=False):
         if not restore_wallet:
-            wallet_args = '%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' % (resources_path, wallet_file_path, wallet_log_path)
+            wallet_args = '%s/bin/sumo-wallet-cli --generate-new-wallet %s --log-file %s' % (resources_path, wallet_file_path, wallet_log_path)
         else:
-            wallet_args = '%s/bin/sumo-wallet-cli --log-file=%s --daemon-port 19735 --restore-deterministic-wallet' % (resources_path, wallet_log_path)
+            wallet_args = '%s/bin/sumo-wallet-cli --log-file %s --daemon-port 19735 --restore-deterministic-wallet' % (resources_path, wallet_log_path)
         ProcessManager.__init__(self, wallet_args, "sumo-wallet-cli")
         self.ready = Event()
         self.last_error = ""
 
     def run(self):
         print ("running WalletCliManager")
-        is_ready_str = "Background refresh thread started"
+        is_ready_str = b"Background refresh thread started"
         err_str = "Error:"
-        for line in iter(self.proc.stdout.readline, ""):
-
-            if not self.ready.is_set() and is_ready_str.encode() in line:
+        for line in iter(self.proc.stdout.readline, b""):
+            if not self.ready.is_set() and is_ready_str in line:
+                for i in range(20):
+                    print("TEST")
                 self.ready.set()
                 log("Wallet ready!", LEVEL_INFO, self.proc_name)
             elif err_str.encode() in line:
+
                 self.last_error = line.rstrip()
                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
-#             else:
-#                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
+            else:
+                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
 
         if not self.proc.stdout.closed:
             self.proc.stdout.close()
@@ -157,7 +161,7 @@ class WalletRPCManager(ProcessManager):
         self.is_password_invalid = Event()
 
     def run(self):
-        is_ready_str = "Run net_service loop"
+        is_ready_str = b"Run net_service loop"
         err_str = "ERROR"
         invalid_password = "invalid password"
         height_regex = re.compile(r"Processed block: \<([a-z0-9]+)\>, height (\d+)")
