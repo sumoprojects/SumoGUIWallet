@@ -69,7 +69,7 @@ class LogViewer(QMainWindow):
 
         self.log_file = log_file
         self.setWindowTitle("%s - Log view [%s]" % (APP_NAME, os.path.basename(log_file)))
-
+   
     def load_log(self):
         if not os.path.exists(self.log_file):
             _text = "[No logs]"
@@ -113,7 +113,6 @@ class BaseWebUI(QMainWindow):
 
         if sys.platform == 'win32':
             psutil.Process().nice(psutil.HIGH_PRIORITY_CLASS)
-
 
     def run(self):
         self.view.loadFinished.connect(self.load_finished)
@@ -199,9 +198,6 @@ class MainWebUI(BaseWebUI):
         self.target_height = self.app_settings.settings['blockchain']['height']
         self.current_height = 0
 
-
-
-
     def run(self):
         self.view.loadFinished.connect(self.load_finished)
 #         self.view.load(qt_core.QUrl(self.url))
@@ -217,7 +213,6 @@ class MainWebUI(BaseWebUI):
         QTimer.singleShot(1000, self._load_wallet)
         QTimer.singleShot(2000, self._update_daemon_status)
 
-
     def start_deamon(self):
         #start sumokoind daemon
         self.sumokoind_daemon_manager = SumokoindManager(self.app.property("ResPath"),
@@ -225,7 +220,6 @@ class MainWebUI(BaseWebUI):
                                             self.app_settings.settings['daemon']['block_sync_size'])
 
         self.sumokoind_daemon_manager.start()
-
 
     def show_wallet(self):
         QTimer.singleShot(1000, self.update_wallet_info)

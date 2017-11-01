@@ -22,6 +22,7 @@ from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal
 
 from PyQt5.QtWidgets import QApplication, QLineEdit, QInputDialog, QMessageBox, QFileDialog
 
+
 from utils.common import print_money, print_money2, readFile
 
 from settings import APP_NAME, VERSION, DATA_DIR, COIN, makeDir, seed_languages
@@ -625,12 +626,12 @@ class Hub(QObject):
         self.on_restart_daemon_completed_event.emit()
 
 
+
     @pyqtSlot()
     def view_daemon_log(self):
         log_file = os.path.join(DATA_DIR, 'logs', "sumokoind.log")
         log_dialog = LogViewer(parent=self.ui, log_file=log_file)
         log_dialog.load_log()
-
 
     def update_daemon_status(self, status):
         self.on_daemon_update_status_event.emit(status)
