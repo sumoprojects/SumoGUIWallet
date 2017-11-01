@@ -6,9 +6,9 @@ App main function
 '''
 
 import sys, os, hashlib
-from PyQt5 import QtCore
+from PySide import QtCore
 
-from PyQt5.QtWidgets import QMessageBox
+from PySide.QtGui import QMessageBox
 
 from app.QSingleApplication import QSingleApplication
 from utils.common import DummyStream, getAppPath, readFile
@@ -23,10 +23,10 @@ file_hashes = [
         ('www/scripts/mustache.min.js', '3258bb61f5b69f33076dd0c91e13ddd2c7fe771882adff9345e90d4ab7c32426'),
         ('www/scripts/jquery.qrcode.min.js', 'f4ccf02b69092819ac24575c717a080c3b6c6d6161f1b8d82bf0bb523075032d'),
         ('www/scripts/utils.js', 'd0c6870ed19c92cd123c7443cb202c7629f9cd6807daed698485fda25214bdb4'),
-
+        
         ('www/css/bootstrap.min.css', '2e4ceda16bdb9f59b01ee01552e8a353ee7cc4e4ebac7d51413106094384ef37'),
         ('www/css/font-awesome.min.css', 'b8b02026a298258ce5069d7b6723c2034058d99220b6612b54bc0c5bf774dcfb'),
-
+        
         ('www/css/fonts/fontawesome-webfont.ttf', '7b5a4320fba0d4c8f79327645b4b9cc875a2ec617a557e849b813918eb733499'),
         ('www/css/fonts/glyphicons-halflings-regular.ttf', 'e395044093757d82afcb138957d06a1ea9361bdcf0b442d06a18a8051af57456'),
         ('www/css/fonts/RoboReg.ttf', 'dc66a0e6527b9e41f390f157a30f96caed33c68d5db0efc6864b4f06d3a41a50'),
@@ -40,10 +40,10 @@ def _check_file_integrity(app):
         if not os.path.exists(file_path):
             return False
         data = readFile(file_path)
-        print( file_path, hashlib.sha256(data).hexdigest() )
+        #print( file_path, hashlib.sha256(data).hexdigest() )
         if hashlib.sha256(data).hexdigest() != file_hash:
             return False
-
+        
     return True
 
 
@@ -56,16 +56,16 @@ def main():
         sys.__stdout__ = DummyStream()
         sys.__stderr__ = DummyStream()
         sys.__stdin__ = DummyStream()
-
+              
     # Get application path
     app_path = getAppPath()
     if sys.platform == 'darwin' and hasattr(sys, 'frozen'):
         resources_path = os.path.normpath(os.path.abspath(os.path.join(app_path, "..", "Resources")))
     else:
         resources_path = os.path.normpath(os.path.abspath(os.path.join(app_path, "Resources")))
-
+        
     # Application setup
-
+    
     app = QSingleApplication(sys.argv)
     app.setOrganizationName('Sumokoin')
     app.setOrganizationDomain('www.sumokoin.org')
@@ -74,7 +74,7 @@ def main():
     app.setProperty("ResPath", resources_path)
     if sys.platform == 'darwin':
         app.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus)
-
+        
     if not _check_file_integrity(app):
         QMessageBox.critical(None, "Application Fatal Error", """<b>File integrity check failed!</b>
                 <br><br>This could be a result of unknown (maybe, malicious) action<br> to wallet code files.""")
@@ -84,4 +84,5 @@ def main():
         ui = MainWebUI(app=app, hub=hub, debug=False)
         hub.setUI(ui)
         app.singleStart(ui)
+        
         sys.exit(app.exec_())

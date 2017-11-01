@@ -9,19 +9,16 @@ of appliaction
 from __future__ import print_function
 import sys, os
 
-
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QIODevice, QTimer
-from PyQt5.QtNetwork import QLocalServer, QLocalSocket
+from PyQt5.QtNetwork import QLocalServer, QLocalSocket 
 
 from utils.common import getSockDir, makeDir
-from urllib.parse import urlparse
 
 DATA_DIR = makeDir(os.path.join(getSockDir(), 'SumokoinGUIWallet'))
 
 class QSingleApplication(QApplication):
     sock_file = 'sumokoin_wallet_sock'
-
     if sys.platform == 'win32':
         sock_file = "\\\\.\\pipe\\%s" % sock_file
     elif sys.platform == 'darwin':
@@ -32,15 +29,10 @@ class QSingleApplication(QApplication):
     def singleStart(self, appMain):
         self.appMain = appMain
         # Socket
-
         self.m_socket = QLocalSocket()
         self.m_socket.connected.connect(self.connectToExistingApp)
-        self.m_socket.error.connect(lambda: self.startApplication(first_start=True))
-        try:
-            self.m_socket.connectToServer(self.sock_file, QIODevice.WriteOnly)
-        except Exception as err:
-            print (err, file=sys.stderr )
-
+        self.m_socket.error.connect(lambda:self.startApplication(first_start=True))
+        self.m_socket.connectToServer(self.sock_file, QIODevice.WriteOnly)
 
     def connectToExistingApp(self):
         # Quit application in 250 ms
@@ -64,19 +56,15 @@ class QSingleApplication(QApplication):
             if sys.platform != 'win32':
                 try:
                     os.unlink(self.sock_file)
-                except Exception as err:
+                except Exception, err:
                     print( err, file=sys.stderr )
 
             QTimer.singleShot(250, lambda : self.startApplication(first_start=False))
 
     def getNewConnection(self):
         self.new_socket = self.m_server.nextPendingConnection()
-        try:
-            self.new_socket.readyRead.connect(self.readSocket)
-        except Exception as err:
-            print (err, file=sys.stderr )
+        self.new_socket.readyRead.connect(self.readSocket)
 
     def readSocket(self):
         f = self.new_socket.readLine()
-        self.appMain.processURLProtocol(f)
-        print (appMain.processURLProtocol(f))
+        self.appMain.processURLProtocol(str(f))

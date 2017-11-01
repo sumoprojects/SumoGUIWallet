@@ -1,7 +1,5 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 ## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 '''
 Hub is a communication medium between Python codes and web UI
@@ -15,9 +13,9 @@ import uuid
 import json
 import re
 import hashlib
-import pathlib
+import webbrowser
 from shutil import copy2
-from pathlib import Path
+
 
 from PyQt5 import QtGui
 from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal
@@ -29,7 +27,6 @@ from utils.common import print_money, print_money2, readFile
 from settings import APP_NAME, VERSION, DATA_DIR, COIN, makeDir, seed_languages
 from utils.logger import log, LEVEL_ERROR, LEVEL_INFO
 
-
 # from utils.notify import Notify
 # from sys import stderr
 
@@ -37,11 +34,12 @@ tray_icon_tooltip = "%s v%d.%d" % (APP_NAME, VERSION[0], VERSION[1])
 
 from manager.ProcessManager import WalletCliManager
 
-
 wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
 
 password_regex = re.compile(r"^([a-zA-Z0-9!@#$%^&*]{6,128})$")
+
+from webui import LogViewer
 
 class Hub(QObject):
 
@@ -84,6 +82,7 @@ class Hub(QObject):
         self.on_view_wallet_key_completed_event.connect(self.view_wallet_key)
         self.on_load_app_settings_completed_event.connect(self.copy_text)
 
+
     def setUI(self, ui):
         self.ui = ui
 
@@ -118,7 +117,7 @@ class Hub(QObject):
                                                            new_wallet_file + '.keys'))
                 copy2(wallet_address_filename, os.path.join(wallet_dir_path, \
                                                         new_wallet_file + '.address.txt'))
-            except IOError as err:
+            except IOError, err:
                 self._detail_error_msg("Importing Wallet", "Error importing wallet!", str(err))
                 self.ui.reset_wallet()
                 return False
@@ -194,8 +193,8 @@ class Hub(QObject):
             self.ui.show_wallet();
 
 
-    @pyqtSlot(str)
-    def create_new_wallet(self, mnemonic_seed=''):
+    @pyqtSlot(unicode)
+    def create_new_wallet(self, mnemonic_seed=u''):
         wallet_password = None
         wallet_filepath = ""
         try:
@@ -247,11 +246,12 @@ class Hub(QObject):
                 self.on_new_wallet_show_progress_event.emit("Restoring wallet..." \
                                         if mnemonic_seed else "Creating wallet...")
                 self.app_process_events()
-                wallet_filepath = os.path.join( wallet_dir_path, str(uuid.uuid4().hex) , '.bin')
+                wallet_filepath = os.path.join(wallet_dir_path, str(uuid.uuid4().hex) + '.bin')
                 wallet_log_path = os.path.join(wallet_dir_path, 'sumo-wallet-cli.log')
                 resources_path = self.app.property("ResPath")
                 if not mnemonic_seed: # i.e. create new wallet
-                    self.wallet_cli_manager = WalletCliManager(resources_path, wallet_filepath, wallet_log_path)
+                    self.wallet_cli_manager = WalletCliManager(resources_path, \
+                                                wallet_filepath, wallet_log_path)
                     self.wallet_cli_manager.start()
                     self.app_process_events(1)
                     self.wallet_cli_manager.send_command(wallet_password)
@@ -277,7 +277,7 @@ class Hub(QObject):
                     self.wallet_cli_manager.send_command("exit")
 
                 self.app_process_events(2)
-        except Exception as err:
+        except Exception, err:
             log(str(err), LEVEL_ERROR)
             last_wallet_error = self.wallet_cli_manager.last_error
             error_detailed_text = last_wallet_error if last_wallet_error else str(err)
@@ -288,7 +288,6 @@ class Hub(QObject):
             return
 
         if os.path.exists(wallet_filepath):
-
             wallet_address = readFile(wallet_filepath + ".address.txt")
             self.ui.wallet_info.wallet_filepath = wallet_filepath
             self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
@@ -561,8 +560,7 @@ class Hub(QObject):
         if not result:
             return
 
-        print (self.ui.wallet_info.wallet_password)
-        if hashlib.sha256(wallet_password.encode()).hexdigest() != self.ui.wallet_info.wallet_password:
+        if hashlib.sha256(wallet_password).hexdigest() != self.ui.wallet_info.wallet_password:
             QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
             return
 
@@ -614,6 +612,25 @@ class Hub(QObject):
     def about_app(self):
         self.ui.about()
 
+    @pyqtSlot(str)
+    def open_link(self, link):
+        webbrowser.open(link)
+
+    @pyqtSlot()
+    def restart_daemon(self):
+        self.app_process_events(1)
+        self.ui.sumokoind_daemon_manager.stop()
+        self.ui.start_deamon()
+        self.app_process_events(5)
+        self.on_restart_daemon_completed_event.emit()
+
+
+    @pyqtSlot()
+    def view_daemon_log(self):
+        log_file = os.path.join(DATA_DIR, 'logs', "sumokoind.log")
+        log_dialog = LogViewer(parent=self.ui, log_file=log_file)
+        log_dialog.load_log()
+
 
     def update_daemon_status(self, status):
         self.on_daemon_update_status_event.emit(status)
@@ -649,9 +666,8 @@ class Hub(QObject):
         text = dlg.textValue()
         return (text, result)
 
-    @pyqtSlot()
-    def _show_wallet_info(self):
 
+    def _show_wallet_info(self):
         wallet_rpc_request = self.ui.wallet_rpc_manager.rpc_request
         wallet_info = {}
         wallet_info['address'] = self.ui.wallet_info.wallet_address
@@ -662,3 +678,6 @@ class Hub(QObject):
         wallet_info['unlocked_balance'] = print_money(unlocked_balance)
 
         self.on_new_wallet_show_info_event.emit(json.dumps(wallet_info))
+
+
+    

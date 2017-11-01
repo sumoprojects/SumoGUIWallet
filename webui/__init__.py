@@ -11,8 +11,8 @@ import sys
 import hashlib
 import os, json
 import copy
-import PyQt5
 from time import sleep
+import PyQt5
 
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QApplication, QMainWindow, \
@@ -27,7 +27,6 @@ from PyQt5.QtWebKitWidgets import QWebView
 from PyQt5.QtCore import QTimer
 
 
-
 from settings import APP_NAME, USER_AGENT, VERSION, COIN
 from utils.logger import log, LEVEL_DEBUG, LEVEL_ERROR, LEVEL_INFO
 from utils.common import readFile
@@ -38,9 +37,54 @@ from rpc import RPCRequest, DaemonRPCRequest
 from classes import AppSettings, WalletInfo
 from html import index, newwallet
 
+import psutil
+
+log_text_tmpl = """
+<index>
+    <head>
+        <style type="text/css">
+            body{
+                font-family: "Lucida Console", "Courier New", Monaco, Courier, monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <div style="width=100%%;height:100%%">
+            <code><pre>
+%s
+            </pre></code>
+        </div>
+    <body>
+</index>
+"""
+
+class LogViewer(QMainWindow):
+    def __init__(self, parent, log_file):
+        QMainWindow.__init__(self, parent)
+        self.view = web_core.QWebView(self)
+        self.view.setContextMenuPolicy(qt_core.Qt.NoContextMenu)
+        self.view.setCursor(qt_core.Qt.ArrowCursor)
+        self.view.setZoomFactor(1)
+        self.setCentralWidget(self.view)
+
+        self.log_file = log_file
+        self.setWindowTitle("%s - Log view [%s]" % (APP_NAME, os.path.basename(log_file)))
+
+    def load_log(self):
+        if not os.path.exists(self.log_file):
+            _text = "[No logs]"
+        else:
+            with open(self.log_file) as f:
+                f.seek (0, 2)           # Seek @ EOF
+                fsize = f.tell()        # Get Size
+                f.seek (max (fsize-4*1024*1024, 0), 0) # read last 4MB
+                _text = f.read()
+        self.view.setHtml(log_text_tmpl % (_text, ))
+        self.resize(1100, 600)
+        self.show()
+
 class BaseWebUI(QMainWindow):
     def __init__(self, html, app, hub, window_size, debug=False):
-
         QMainWindow.__init__(self)
         self.app = app
         self.hub = hub
@@ -48,6 +92,7 @@ class BaseWebUI(QMainWindow):
         self.html = html
         self.url = "file:///" \
             + os.path.join(self.app.property("ResPath"), "www/").replace('\\', '/')
+
 
         self.is_first_load = True
         self.view = PyQt5.QtWebKitWidgets.QWebView(self)
@@ -59,12 +104,15 @@ class BaseWebUI(QMainWindow):
         self.view.setZoomFactor(1)
 
         self.setWindowTitle(APP_NAME)
-        self.icon = self._getQIcon('sumokoin_icon_32.png')
+        self.icon = self._getQIcon('sumokoin_icon_64.png')
         self.setWindowIcon(self.icon)
 
         self.setCentralWidget(self.view)
         self.setFixedSize(window_size)
         self.center()
+
+        if sys.platform == 'win32':
+            psutil.Process().nice(psutil.HIGH_PRIORITY_CLASS)
 
 
     def run(self):
@@ -152,17 +200,14 @@ class MainWebUI(BaseWebUI):
         self.current_height = 0
 
 
+
+
     def run(self):
         self.view.loadFinished.connect(self.load_finished)
 #         self.view.load(qt_core.QUrl(self.url))
         self.view.setHtml(self.html, qt_core.QUrl(self.url))
 
-        #start sumokoind daemon
-        self.sumokoind_daemon_manager = SumokoindManager(self.app.property("ResPath"),
-                                            self.app_settings.settings['daemon']['log_level'],
-                                            self.app_settings.settings['daemon']['block_sync_size'])
-
-        self.sumokoind_daemon_manager.start()
+        self.start_deamon()
         self.daemon_rpc_request = DaemonRPCRequest(self.app)
 
         self.timer = QTimer(self)
@@ -171,6 +216,15 @@ class MainWebUI(BaseWebUI):
 
         QTimer.singleShot(1000, self._load_wallet)
         QTimer.singleShot(2000, self._update_daemon_status)
+
+
+    def start_deamon(self):
+        #start sumokoind daemon
+        self.sumokoind_daemon_manager = SumokoindManager(self.app.property("ResPath"),
+                                            self.app_settings.settings['daemon']['log_level'],
+                                            self.app_settings.settings['daemon']['block_sync_size'])
+
+        self.sumokoind_daemon_manager.start()
 
 
     def show_wallet(self):
@@ -291,7 +345,7 @@ class MainWebUI(BaseWebUI):
                     wallet_info["recent_txs"].append(tx)
 
             self.hub.on_wallet_update_info_event.emit(json.dumps(wallet_info))
-        except Exception as err:
+        except Exception, err:
             log(str(err), LEVEL_ERROR)
 
 
@@ -343,6 +397,10 @@ class MainWebUI(BaseWebUI):
                     break
 
             if not wallet_password:
+#                 self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
+#                 self.hub.setNewWalletUI(self.new_wallet_ui)
+#                 self.new_wallet_ui.run()
+
                 self.close()
                 return
             else:
