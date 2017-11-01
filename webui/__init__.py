@@ -12,16 +12,19 @@ import hashlib
 import os, json
 import copy
 from time import sleep
+import PyQt5
 
-from PySide.QtGui import QApplication, QMainWindow, QIcon, \
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import QApplication, QMainWindow, \
             QSystemTrayIcon, QMenu, QAction, QMessageBox, QFileDialog, \
             QInputDialog, QLineEdit
-            
-from PySide.QtCore import QObject, Slot, Signal
+from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal
 
-import PySide.QtCore as qt_core
-import PySide.QtWebKit as web_core
-from PySide.QtCore import QTimer
+import PyQt5.QtCore as qt_core
+
+import PyQt5.QtWebKit as web_core
+from PyQt5.QtWebKitWidgets import QWebView
+from PyQt5.QtCore import QTimer
 
 
 from settings import APP_NAME, USER_AGENT, VERSION, COIN
@@ -63,10 +66,10 @@ class LogViewer(QMainWindow):
         self.view.setCursor(qt_core.Qt.ArrowCursor)
         self.view.setZoomFactor(1)
         self.setCentralWidget(self.view)
-        
+
         self.log_file = log_file
         self.setWindowTitle("%s - Log view [%s]" % (APP_NAME, os.path.basename(log_file)))
-    
+   
     def load_log(self):
         if not os.path.exists(self.log_file):
             _text = "[No logs]"
@@ -89,50 +92,49 @@ class BaseWebUI(QMainWindow):
         self.html = html
         self.url = "file:///" \
             + os.path.join(self.app.property("ResPath"), "www/").replace('\\', '/')
-        
-        
+
+
         self.is_first_load = True
-        self.view = web_core.QWebView(self)
-        
+        self.view = PyQt5.QtWebKitWidgets.QWebView(self)
+
         if not self.debug:
             self.view.setContextMenuPolicy(qt_core.Qt.NoContextMenu)
-        
+
         self.view.setCursor(qt_core.Qt.ArrowCursor)
         self.view.setZoomFactor(1)
-        
+
         self.setWindowTitle(APP_NAME)
         self.icon = self._getQIcon('sumokoin_icon_64.png')
         self.setWindowIcon(self.icon)
-        
+
         self.setCentralWidget(self.view)
         self.setFixedSize(window_size)
         self.center()
-        
+
         if sys.platform == 'win32':
             psutil.Process().nice(psutil.HIGH_PRIORITY_CLASS)
-        
-        
+
     def run(self):
         self.view.loadFinished.connect(self.load_finished)
 #         self.view.load(qt_core.QUrl(self.url))
         self.view.setHtml(self.html, qt_core.QUrl(self.url))
-        
-        
+
+
     def center(self):
         frameGm = self.frameGeometry()
         screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
         centerPoint = QApplication.desktop().screenGeometry(screen).center()
         frameGm.moveCenter(centerPoint)
         self.move(frameGm.topLeft())
-        
+
     def load_finished(self):
-        #This is the actual context/frame a webpage is running in.  
+        #This is the actual context/frame a webpage is running in.
         # Other frames could include iframes or such.
         main_page = self.view.page()
         main_frame = main_page.mainFrame()
         # ATTENTION here's the magic that sets a bridge between Python to HTML
         main_frame.addToJavaScriptWindowObject("app_hub", self.hub)
-        
+
         if self.is_first_load: ## Avoid re-settings on page reload (if happened)
             change_setting = main_page.settings().setAttribute
             settings = web_core.QWebSettings
@@ -142,23 +144,23 @@ class BaseWebUI(QMainWindow):
             change_setting(settings.OfflineWebApplicationCacheEnabled, True)
             change_setting(settings.JavascriptCanOpenWindows, True)
             change_setting(settings.PluginsEnabled, False)
-            
+
             # Show web inspector if debug on
             if self.debug:
                 self.inspector = web_core.QWebInspector()
                 self.inspector.setPage(self.view.page())
                 self.inspector.show()
-            
+
             self.is_first_load = False
-                    
+
         #Tell the HTML side, we are open for business
         main_frame.evaluateJavaScript("app_ready()")
-        
+
     def _getQIcon(self, icon_file):
         return QIcon(os.path.join(self.app.property("ResPath"), 'icons', icon_file))
 
 
-        
+
 class NewWalletWebUI(BaseWebUI):
     def __init__(self, app, hub, debug):
         window_size = qt_core.QSize(810, 560)
@@ -166,79 +168,74 @@ class NewWalletWebUI(BaseWebUI):
         self.setWindowFlags(qt_core.Qt.FramelessWindowHint)
         self.show()
 
-        
+
 class MainWebUI(BaseWebUI):
     def __init__(self, app, hub, debug):
         window_size = qt_core.QSize(800, 600)
         BaseWebUI.__init__(self, index.html, app, hub, window_size, debug)
         self.agent = '%s v.%s' % (USER_AGENT, '.'.join(str(v) for v in VERSION))
         log("Starting [%s]..." % self.agent, LEVEL_INFO)
-        
+
         self.app = app
         self.debug = debug
         self.hub = hub
-        
+
         self.app.aboutToQuit.connect(self._handleAboutToQuit)
-        
+
         self.sumokoind_daemon_manager = None
         self.wallet_cli_manager = None
         self.wallet_rpc_manager = None
-        
+
         self.new_wallet_ui = None
-        
+
         self.wallet_info = WalletInfo(app)
-        
+
         # load app settings
         self.app_settings = AppSettings()
         self.app_settings.load()
-        
+
         ## Blockchain height
         self.target_height = self.app_settings.settings['blockchain']['height']
         self.current_height = 0
-        
-        
-        
-    
+
     def run(self):
         self.view.loadFinished.connect(self.load_finished)
 #         self.view.load(qt_core.QUrl(self.url))
         self.view.setHtml(self.html, qt_core.QUrl(self.url))
-        
+
         self.start_deamon()
         self.daemon_rpc_request = DaemonRPCRequest(self.app)
-         
+
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_daemon_status)
         self.timer.start(10000)
-        
+
         QTimer.singleShot(1000, self._load_wallet)
         QTimer.singleShot(2000, self._update_daemon_status)
-        
-    
+
     def start_deamon(self):
         #start sumokoind daemon
-        self.sumokoind_daemon_manager = SumokoindManager(self.app.property("ResPath"), 
-                                            self.app_settings.settings['daemon']['log_level'], 
+        self.sumokoind_daemon_manager = SumokoindManager(self.app.property("ResPath"),
+                                            self.app_settings.settings['daemon']['log_level'],
                                             self.app_settings.settings['daemon']['block_sync_size'])
-        
+
         self.sumokoind_daemon_manager.start()
-        
-        
+
     def show_wallet(self):
         QTimer.singleShot(1000, self.update_wallet_info)
         self.timer2 = QTimer(self)
         self.timer2.timeout.connect(self.update_wallet_info)
         self.timer2.start(10000)
         self.show()
-        
-    
+
+
     def run_wallet_rpc(self, wallet_password, log_level=0):
         # first, try to stop any wallet RPC server running
         try:
             RPCRequest('wallet_rpc').send_request({"method":"stop_wallet"})
         except:
             pass
-        
+
         while True:
             self.hub.app_process_events()
             sumokoind_info = self.daemon_rpc_request.get_info()
@@ -249,7 +246,7 @@ class MainWebUI(BaseWebUI):
                                                 self.app, log_level)
                 self.wallet_rpc_manager.start()
                 break
-        
+
     def _update_daemon_status(self):
         target_height = 0
         sumokoind_info = self.daemon_rpc_request.get_info()
@@ -263,19 +260,19 @@ class MainWebUI(BaseWebUI):
                 self.target_height = target_height;
         else:
             status = sumokoind_info['status']
-        
-        info = {"status": status, 
-                "current_height": self.current_height, 
+
+        info = {"status": status,
+                "current_height": self.current_height,
                 "target_height": self.target_height,
             }
-        
+
         self.hub.update_daemon_status(json.dumps(info))
-    
-    
+
+
     def update_wallet_info(self):
         if not self.wallet_rpc_manager.is_ready():
             return
-        
+
         wallet_info = {}
         try:
             balance, unlocked_balance = self.wallet_rpc_manager.rpc_request.get_balance()
@@ -296,19 +293,19 @@ class MainWebUI(BaseWebUI):
                                 tx["status"] = "out"
                                 txs.append(tx)
                                 self.app.processEvents()
-                            
+
                         if "in" in transfers:
                             for tx in transfers["in"]:
                                 tx["direction"] = "in"
                                 tx["status"] = "in"
                                 txs.append(tx)
                                 self.app.processEvents()
-                                
+
                         sorted_txs = sorted(txs, key=lambda k: k['height'])
                         self.wallet_info.add_transfers(sorted_txs)
                 self.wallet_info.bc_height = self.current_height
-                        
-            pending_transfers = self.wallet_rpc_manager.rpc_request.get_transfers(tx_pending=True, tx_in_pool=True)            
+
+            pending_transfers = self.wallet_rpc_manager.rpc_request.get_transfers(tx_pending=True, tx_in_pool=True)
             pending_txs = []
             if pending_transfers["status"] == "OK":
                 if "pending" in pending_transfers:
@@ -318,7 +315,7 @@ class MainWebUI(BaseWebUI):
                         tx["confirmation"] = 0
                         pending_txs.append(tx)
                         self.app.processEvents()
-                
+
                 if "pool" in pending_transfers:
                     for tx in pending_transfers["pool"]:
                         tx["direction"] = "in"
@@ -326,38 +323,38 @@ class MainWebUI(BaseWebUI):
                         tx["confirmation"] = 0
                         pending_txs.append(tx)
                         self.app.processEvents()
-                    
-            self.wallet_info.wallet_pending_transfers = sorted(pending_txs, 
-                                                    key=lambda k: k['timestamp'], 
+
+            self.wallet_info.wallet_pending_transfers = sorted(pending_txs,
+                                                    key=lambda k: k['timestamp'],
                                                     reverse=True)
-                        
+
             if len(self.wallet_info.wallet_pending_transfers) > 0:
                 wallet_info["recent_txs"] = self.wallet_info.wallet_pending_transfers[:2]
             else:
                 wallet_info["recent_txs"] = []
-            
+
             if len(wallet_info["recent_txs"]) < 2:
                 for tx in self.wallet_info.wallet_transfers[:2 - len(wallet_info["recent_txs"])]:
                     tx["confirmation"] = self.target_height - tx["height"] if self.target_height > tx["height"] else 0
                     wallet_info["recent_txs"].append(tx)
-            
+
             self.hub.on_wallet_update_info_event.emit(json.dumps(wallet_info))
         except Exception, err:
             log(str(err), LEVEL_ERROR)
-            
-    
+
+
     def show_new_wallet_ui(self):
         self.reset_wallet(delete_files=False)
         self.hide()
         self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
         self.hub.setNewWalletUI(self.new_wallet_ui)
         self.new_wallet_ui.run()
-        
-        
+
+
     def reset_wallet(self, delete_files=True):
         if self.wallet_rpc_manager is not None:
             self.wallet_rpc_manager.stop()
-        
+
         wallet_filepath = self.wallet_info.wallet_filepath
         if delete_files and wallet_filepath and os.path.exists(wallet_filepath):
             try:
@@ -366,16 +363,16 @@ class MainWebUI(BaseWebUI):
                 os.remove(wallet_filepath + ".address.txt")
             except:
                 pass
-        
+
         self.wallet_info.reset()
         if self.new_wallet_ui:
             self.hub.on_new_wallet_ui_reset_event.emit()
         self.hub.on_main_wallet_ui_reset_event.emit()
-        
+
     def about(self):
         QMessageBox.about(self, "About", \
             u"%s <br><br>Copyright© 2017 - Sumokoin Projects (www.sumokoin.org)" % self.agent)
-    
+
     def _load_wallet(self):
         if self.wallet_info.load():
             wallet_password = None
@@ -392,12 +389,12 @@ class MainWebUI(BaseWebUI):
                                         "Password is required to open wallet!")
                 else:
                     break
-                
+
             if not wallet_password:
 #                 self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
 #                 self.hub.setNewWalletUI(self.new_wallet_ui)
 #                 self.new_wallet_ui.run()
-                
+
                 self.close()
                 return
             else:
@@ -410,7 +407,7 @@ class MainWebUI(BaseWebUI):
                             "Error: Wallet password is incorrect!<br><br>Please retry...")
                         self._load_wallet()
                         return
-                
+
                 self.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
                 self.update_wallet_info()
                 self.timer2 = QTimer(self)
@@ -420,8 +417,8 @@ class MainWebUI(BaseWebUI):
             self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
             self.hub.setNewWalletUI(self.new_wallet_ui)
             self.new_wallet_ui.run()
-        
-    
+
+
     def _handleAboutToQuit(self):
         log("%s is about to quit..." % APP_NAME, LEVEL_INFO)
         if hasattr(self, "timer"):
@@ -432,6 +429,6 @@ class MainWebUI(BaseWebUI):
             self.wallet_rpc_manager.stop()
         if self.sumokoind_daemon_manager is not None:
             self.sumokoind_daemon_manager.stop()
-        
+
         self.app_settings.settings['blockchain']['height'] = self.target_height
         self.app_settings.save()
