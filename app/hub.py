@@ -52,7 +52,7 @@ class Hub(QObject):
     on_wallet_update_info_event = pyqtSignal(str)
     on_wallet_rescan_spent_completed_event = pyqtSignal()
     on_wallet_rescan_bc_completed_event = pyqtSignal()
-    on_wallet_send_tx_completed_event = pyqtSignal(float, str, str, int, int, str, bool)
+    on_wallet_send_tx_completed_event = pyqtSignal(str)
     on_generate_payment_id_event = pyqtSignal(str, str)
     on_load_address_book_completed_event = pyqtSignal(str)
     on_tx_detail_found_event = pyqtSignal(str)
@@ -74,12 +74,12 @@ class Hub(QObject):
         self.on_wallet_update_info_event.connect(self.copy_text)
         self.on_wallet_rescan_spent_completed_event.connect(self._show_wallet_info)
         self.on_wallet_rescan_bc_completed_event.connect(self._show_wallet_info)
-        self.on_wallet_send_tx_completed_event.connect(self.send_tx)
-        #self.on_generate_payment_id_event.connect(self.generate_payment_id)
+        self.on_wallet_send_tx_completed_event.connect(self.copy_text)
+        self.on_generate_payment_id_event.connect(self.copy_text)
         self.on_load_address_book_completed_event.connect(self.copy_text)
         self.on_tx_detail_found_event.connect(self.copy_text)
         self.on_load_tx_history_completed_event.connect(self.copy_text)
-        self.on_view_wallet_key_completed_event.connect(self.view_wallet_key)
+        self.on_view_wallet_key_completed_event.connect(self.copy_text)
         self.on_load_app_settings_completed_event.connect(self.copy_text)
 
 
@@ -678,6 +678,3 @@ class Hub(QObject):
         wallet_info['unlocked_balance'] = print_money(unlocked_balance)
 
         self.on_new_wallet_show_info_event.emit(json.dumps(wallet_info))
-
-
-    
