@@ -64,25 +64,6 @@ class Hub(QObject):
     def __init__(self, app):
         super(Hub, self).__init__()
         self.app = app
-        self.connect_signals()
-
-    def connect_signals(self):
-        self.on_new_wallet_show_info_event.connect(self.copy_text)
-        self.on_new_wallet_show_progress_event.connect(self.copy_text)
-        self.on_new_wallet_ui_reset_event.connect(self.open_new_wallet)
-        self.on_new_wallet_update_processed_block_height_event.connect(self.copy_text)
-        self.on_daemon_update_status_event.connect(self.copy_text)
-        self.on_wallet_update_info_event.connect(self.copy_text)
-        self.on_wallet_rescan_spent_completed_event.connect(self._show_wallet_info)
-        self.on_wallet_rescan_bc_completed_event.connect(self._show_wallet_info)
-        self.on_wallet_send_tx_completed_event.connect(self.copy_text)
-        self.on_generate_payment_id_event.connect(self.copy_text)
-        self.on_load_address_book_completed_event.connect(self.copy_text)
-        self.on_tx_detail_found_event.connect(self.copy_text)
-        self.on_load_tx_history_completed_event.connect(self.copy_text)
-        self.on_view_wallet_key_completed_event.connect(self.copy_text)
-        self.on_load_app_settings_completed_event.connect(self.copy_text)
-
 
     def setUI(self, ui):
         self.ui = ui
