@@ -183,6 +183,19 @@ class WalletRPCRequest():
         rpc_input["params"] = params
         return self.send_request(rpc_input)
     
+    def transfer_all(self, address, payment_id, priority, mixin):
+        rpc_input = {"method": "sweep_all"}
+        params = {
+            "address": address,
+            "priority": priority,
+            "mixin": mixin
+        }
+        if payment_id:
+            params["payment_id"] = payment_id
+            
+        rpc_input["params"] = params
+        return self.send_request(rpc_input)
+    
     def set_tx_notes(self, txids, notes):
         rpc_input = {"method": "set_tx_notes"}
         params = {"txids": txids, "notes": notes}

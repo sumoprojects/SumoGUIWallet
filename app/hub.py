@@ -320,12 +320,20 @@ class Hub(QObject):
         self.on_wallet_rescan_bc_completed_event.emit()
     
         
-    @Slot(float, str, str, int, int, str, bool)
-    def send_tx(self, amount, address, payment_id, priority, mixin, tx_desc, save_address):
+    @Slot(float, str, str, int, int, str, bool, bool)
+    def send_tx(self, amount, address, payment_id, priority, mixin, tx_desc, save_address, sweep_all):
         if not payment_id and not address.startswith("Sumi"):
             result = QMessageBox.question(self.ui, "Sending Coins Without Payment ID?", \
                                       "Are you sure to send coins without Payment ID?", \
                                        QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
+            if result == QMessageBox.No:
+                self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Sending coin cancelled"}')
+                return
+            
+        if sweep_all:
+            result = QMessageBox.question(self.ui, "Sending all your coins?", \
+                                      "This action will send all your unlocked coins at the time you hit Yes. Are you sure ?", \
+                                      QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
             if result == QMessageBox.No:
                 self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Sending coin cancelled"}')
                 return
@@ -343,8 +351,12 @@ class Hub(QObject):
             return
         
         amount = int(amount*COIN)
-        ret = self.ui.wallet_rpc_manager.rpc_request.transfer_split(amount, \
-                                            address, payment_id, priority, mixin)
+        
+        if sweep_all:
+            ret = elf.ui.wallet_rpc_manager.rpc_request.transfer_all(address, payment_id, priority, mixin)
+        else:  
+            ret = self.ui.wallet_rpc_manager.rpc_request.transfer_split(amount, \
+                                                address, payment_id, priority, mixin)            
          
         if ret['status'] == "ERROR":
             self.on_wallet_send_tx_completed_event.emit(json.dumps(ret));
@@ -371,9 +383,12 @@ class Hub(QObject):
                         
             msg = "<b>Coins successfully sent in the following transaction(s):</b><br><br>"
             for i in range(len(ret['tx_hash_list'])):
-                msg += "- Transaction ID: %s <br>  - Amount: %s <br>  - Fee: %s <br><br>" % (ret['tx_hash_list'][i], \
-                                                    print_money2(ret['amount_list'][i]), \
-                                                    print_money2(ret['fee_list'][i]))
+                if sweep_all:
+                    msg += "- Transaction ID: %s <br>" % (ret['tx_hash_list'][i])
+                else:
+                    msg += "- Transaction ID: %s <br>  - Amount: %s <br>  - Fee: %s <br><br>" % (ret['tx_hash_list'][i], \
+                                                        print_money2(ret['amount_list'][i]), \
+                                                        print_money2(ret['fee_list'][i]))
             QMessageBox.information(self.ui, 'Coins Sent', msg)
             self.ui.update_wallet_info()
             
