@@ -684,6 +684,7 @@ html ="""
             
             function send_tx(){
                 var amount = $('#send_amount').val().trim();
+                var sweep_all = false;
                 var errors = [];
                 amount = parseFloat(amount);
                 
@@ -697,6 +698,9 @@ html ="""
                     $('#send_amount').parent().addClass('has-error');
                 }
                 else{
+                    if(amount == current_unlocked_balance){
+                        sweep_all = true;
+                    }
                     $('#send_amount').parent().removeClass('has-error');
                 }
                 
@@ -738,7 +742,7 @@ html ="""
                 
                 btn_send_tx.disable(true);
                 show_progress("Sending coins... This can take a while for big amount...");
-                app_hub.send_tx(amount, address, payment_id, priority, mixin, tx_desc, $('#checkbox_save_address').is(":checked"));
+                app_hub.send_tx(amount, address, payment_id, priority, mixin, tx_desc, $('#checkbox_save_address').is(":checked"), sweep_all););
                 return false;
             }
             
