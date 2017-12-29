@@ -240,6 +240,7 @@ html ="""
             {
                 -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
                 background-color: #F5F5F5;
+                border-radius: 6px;
             }
                        
             
@@ -248,6 +249,7 @@ html ="""
             {
                 width: 8px;
                 background-color: #F5F5F5;
+                border-radius: 6px;
             }
             
             .tx-destinations::-webkit-scrollbar{
@@ -257,8 +259,9 @@ html ="""
             #address-book-box table tbody::-webkit-scrollbar-thumb,
                 .tx-destinations::-webkit-scrollbar-thumb
             {
+                border-radius: 6px;
                 -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
-                background-color: #ccc;
+                background-color: #5BB0F7;
             }
             
             .tx-destinations {
@@ -287,6 +290,84 @@ html ="""
                 width:100%;
                 resize:none;
                 font-weight:bold;
+            }
+            
+            .panel-default>.panel-heading {
+              color: #666;
+              background-color: #eee;
+              border-color: #e4e5e7;
+              padding: 0;
+              -webkit-user-select: none;
+              -moz-user-select: none;
+              -ms-user-select: none;
+              user-select: none;
+            }
+            
+            .panel-default>.panel-heading a {
+              display: block;
+              padding: 10px 15px;
+            }
+            
+            .panel-default>.panel-heading a:after {
+              font-family:'Glyphicons Halflings';
+              content: "";
+              position: relative;
+              top: 1px;
+              display: inline-block;
+              font-style: normal;
+              font-weight: 400;
+              line-height: 1;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+              float: right;
+              transition: transform .25s linear;
+              -webkit-transition: -webkit-transform .25s linear;
+            }
+            
+            .panel-default>.panel-heading a[aria-expanded="true"] {
+              background-color: #2196F3;
+              color: #fff;
+              font-weight: bold;
+            }
+            
+            .panel-default>.panel-heading a[aria-expanded="false"] {
+                color: #666;
+            }
+            
+            .panel-default>.panel-heading a[aria-expanded="true"]:after {
+              content:"\e114";
+              
+            }
+            
+            .panel-default>.panel-heading a[aria-expanded="false"]:after {
+              content:"\e080";
+            }
+            
+            .panel-default > .panel-heading + .panel-collapse > .panel-body {
+                height: 295px;
+                overflow: auto;
+            }
+            
+            
+            .panel-default > .panel-heading + .panel-collapse > .panel-body::-webkit-scrollbar-track
+            {
+                -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+                border-radius: 6px;
+                background-color: #F5F5F5;
+            }
+                       
+            
+            .panel-default > .panel-heading + .panel-collapse > .panel-body::-webkit-scrollbar
+            {
+                width: 8px;
+                background-color: #F5F5F5;
+            }
+                        
+            .panel-default > .panel-heading + .panel-collapse > .panel-body::-webkit-scrollbar-thumb
+            {
+                border-radius: 6px;
+                -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
+                background-color: #5BB0F7;
             }
             
         </style>
@@ -550,7 +631,6 @@ html ="""
                     if(sync_pct < 100){
                         progress_bar.addClass('progress-bar-striped')
                                                         .addClass('active');
-                        //show_app_progress('Waiting for network synchronization... Be patient! This can take (very) long time...');
                     }
                     else{
                         progress_bar.removeClass('progress-bar-striped')
@@ -619,13 +699,6 @@ html ="""
                         }
                     }
                     
-                    syncing.each(function(index, value){
-                        sync_pct < 100 ? $(this).show() : $(this).hide();
-                    });
-                    
-                    balance_span.css("color", sync_pct < 100 ? "#ccc" : "#666");
-                    unlocked_balance_span.css("color", sync_pct < 100 ? "#ccc" : "#666");
-                    
                     disable_buttons(sync_pct < 100);
                                         
                     if(current_balance != wallet_info['balance']){
@@ -645,13 +718,58 @@ html ="""
                     if(current_address != wallet_info['address']){
                         current_address = wallet_info['address'];
                         receive_address.val(current_address);
-                        $('#receive_address_qrcode').html('');
-                        $('#receive_address_qrcode').qrcode({width: 220,height: 220, text: current_address});
+                    }
+                    
+                    var table_body = $('#table_new_subaddresses tbody');
+                    var new_subaddress_row_tmpl = $('#new_subaddress_row_tmpl').html();
+                    var new_subaddresses = wallet_info['new_subaddresses'];
+                    
+                    table_body.html('');
+                    
+                    for(var i=0; i < new_subaddresses.length; i++){
+                        var subaddress = new_subaddresses[i];
+                        var row_rendered = Mustache.render(new_subaddress_row_tmpl, 
+                            {   'address_index': subaddress['address_index'],
+                                'address' : subaddress['address'],
+                                'address_short' : subaddress['address'].substr(0, 70) + '...'
+                            });
+                        
+                            
+                        table_body.append(row_rendered);
+                    }
+                    
+                    table_body = $('#table_used_subaddresses tbody');
+                    var used_subaddress_row_tmpl = $('#used_subaddress_row_tmpl').html();
+                    var used_subaddresses = wallet_info['used_subaddresses'];
+                    
+                    table_body.html('');
+                    
+                    for(var i=0; i < used_subaddresses.length; i++){
+                        var subaddress = used_subaddresses[i];
+                        var row_rendered = Mustache.render(used_subaddress_row_tmpl, 
+                            {   'address_index': subaddress['address_index'],
+                                'address' : subaddress['address'],
+                                'address_short' : subaddress['address'].substr(0, 40) + '...',
+                                'balance': subaddress['balance'],
+                                'unlocked_balance': subaddress['unlocked_balance'],
+                                'row_font_weight': subaddress['address_index'] == 0 ? 'bold' : 'normal'
+                            });
+                        
+                            
+                        table_body.append(row_rendered);
                     }
                     
                     hide_app_progress();
+                    $('[data-toggle="tooltip"]').tooltip();
                     
                 }, 1);
+            }
+            
+            function show_qrcode(text){
+                $('#qrcode_dialog_body').html('');
+                $('#qrcode_dialog_body').qrcode({width: 200,height: 200, text: text});
+                $('#qrcode_dialog').modal('show');
+                
             }
             
             function disable_buttons(s){
@@ -659,6 +777,13 @@ html ="""
                 rescan_bc_btn.disable(s);
                 btn_send_tx.disable(s);
                 btn_fill_all_money.disable(s);
+                
+                syncing.each(function(index, value){
+                    s ? $(this).show() : $(this).hide();
+                });
+                
+                balance_span.css("color", s ? "#ccc" : "#666");
+                unlocked_balance_span.css("color", s ? "#ccc" : "#666");
             }
             
             function rescan_spent(){
@@ -684,6 +809,7 @@ html ="""
             
             function send_tx(){
                 var amount = $('#send_amount').val().trim();
+                var sweep_all = false;
                 var errors = [];
                 amount = parseFloat(amount);
                 
@@ -697,6 +823,9 @@ html ="""
                     $('#send_amount').parent().addClass('has-error');
                 }
                 else{
+                    if(amount == current_unlocked_balance){
+                        sweep_all = true;
+                    }
                     $('#send_amount').parent().removeClass('has-error');
                 }
                 
@@ -705,7 +834,10 @@ html ="""
                     errors.push("Address is required!");
                     $('#send_address').parent().addClass('has-error');
                 }
-                else if(!((address.substr(0, 4) == "Sumo" && address.length == 99) || (address.substr(0, 4) == "Sumi"  && address.length == 110))){
+                else if(!((address.substr(0, 4) == "Sumo" && address.length == 99) || 
+                    (address.substr(0, 4) == "Sumi"  && address.length == 110) || 
+                    (address.substr(0, 4) == "Subo"  && address.length == 98)))
+                {
                     errors.push("Address is not valid!");
                     $('#send_address').parent().addClass('has-error');
                 }
@@ -738,7 +870,7 @@ html ="""
                 
                 btn_send_tx.disable(true);
                 show_progress("Sending coins... This can take a while for big amount...");
-                app_hub.send_tx(amount, address, payment_id, priority, mixin, tx_desc, $('#checkbox_save_address').is(":checked"));
+                app_hub.send_tx(amount, address, payment_id, priority, mixin, tx_desc, $('#checkbox_save_address').is(":checked"), sweep_all);
                 return false;
             }
             
@@ -750,13 +882,28 @@ html ="""
             
             function copy_address(){
                 $('#btn_copy_address').tooltip('show');
-                receive_address.select();
+                //receive_address.select();
                 app_hub.copy_text(receive_address.val());
                 setTimeout(function(){
                     $('#btn_copy_address').tooltip('hide');
                 }, 1000);
                 return false;
             }
+            
+            function qr_address(){
+                show_qrcode(receive_address.val());
+                return false;
+            }
+            
+            function copy_subaddress(el, subaddress_text){
+                $(el).tooltip('show');
+                app_hub.copy_text(subaddress_text);
+                setTimeout(function(){
+                    $(el).tooltip('hide');
+                }, 1000);
+                return false;
+            }
+            
             
             function copy_integrated_address(){
                 $('#btn_copy_integrated_address').tooltip('show');
@@ -934,40 +1081,73 @@ html ="""
                     <form id="form_receive" class="form-horizontal">
                         <div class="form-group">
                             <div class="col-sm-12">
-                                <label for="receive_address" class="col-xs-2 control-label">Address</label>
+                                <label for="receive_address" class="col-xs-2 control-label">Main Address</label>
                                 <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
                                     <input id="receive_address" type="text" class="form-control" style="font-weight: bold" maxlength="64" readonly />
                                     <span class="input-group-btn">
                                         <button id="btn_copy_address" class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="copy_address()" data-toggle="tooltip" data-placement="bottom" data-trigger="manual" title="Address copied"><i class="fa fa-copy"></i></button>
+                                        <button id="btn_qr_address" class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="qr_address()" title="Show QR code"><i class="fa fa-qrcode"></i></button>
                                     </span>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-12">
-                                <label for="receive_payment_id" class="col-xs-2 control-label">Payment ID</label>
-                                <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
-                                    <input id="receive_payment_id" type="text" class="form-control" placeholder="16 hexadecimal characters" maxlength="16"/>
-                                    <span class="input-group-btn">
-                                        <button id="btn_generate_payment_id" class="btn btn-primary btn-sm"  style="text-transform: none" type="button" tabindex="-1" onclick="generate_payment_id()">Generate Payment ID</button>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="col-sm-12">
-                                <label for="receive_integrated_address" class="col-xs-2 control-label">Integrated address</label>
-                                <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
-                                    <input id="receive_integrated_address" type="text" class="form-control" style="font-weight: bold" maxlength="110" readonly/>
-                                    <span class="input-group-btn">
-                                        <button id="btn_copy_integrated_address" class="btn btn-primary btn-sm"  style="text-transform: none" type="button" tabindex="-1" onclick="copy_integrated_address()" data-toggle="tooltip" data-placement="bottom" data-trigger="manual" title="Address copied" disabled><i class="fa fa-copy"></i></button>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="receive_address_qrcode" style="text-align:center">
                         </div>
                     </form>
+                    <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true" style="margin-left: 15px; margin-right: 15px;">
+                        <div class="panel panel-default">
+                          <div class="panel-heading" role="tab" id="headingOne">
+                            <h4 class="panel-title">
+                            <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                              Used Addresses
+                            </a>
+                          </h4>
+                          </div>
+                          <div id="collapseOne" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingOne">
+                            <div class="panel-body">
+                                <div class="table-responsive">
+                                    <table id="table_used_subaddresses" class="table table-hover table-striped table-condensed">
+                                        <thead>
+                                            <tr>
+                                                <th>Address</th>
+                                                <th style="text-align: right">Balance</th>
+                                                <th style="text-align: right">Unlocked</th>
+                                                <th style="text-align: right">Index</th>
+                                                <th>&nbsp;</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="panel panel-default">
+                          <div class="panel-heading" role="tab" id="headingTwo">
+                            <h4 class="panel-title">
+                            <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
+                              New (Ghost) Addresses
+                            </a>
+                          </h4>
+                          </div>
+                          <div id="collapseTwo" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="headingTwo">
+                            <div class="panel-body" style="overflow: auto">
+                                <div class="table-responsive">
+                                    <table id="table_new_subaddresses" class="table table-hover table-striped table-condensed">
+                                        <thead>
+                                            <tr>
+                                                <th>Address</th>
+                                                <th style="text-align: right">Index</th>
+                                                <th>&nbsp;</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                          </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="balance_tab" class="tab-pane fade in active">
                     <h3>BALANCE</h3>
@@ -1012,7 +1192,7 @@ html ="""
                                 <div class="col-sm-12">
                                     <label for="send_address" class="col-xs-2 control-label">Address</label>
                                     <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
-                                        <input id="send_address" type="text" class="form-control"  placeholder="Paste receiving address here..." maxlength="110"/>
+                                        <input id="send_address" type="text" class="form-control"  placeholder="Paste receiving address here (Ctrl+V)..." maxlength="110"/>
                                         <span class="input-group-btn">
                                             <button class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="show_address_book()">
                                                 <i class="fa fa-address-book"></i> Address book...
@@ -1025,7 +1205,7 @@ html ="""
                                 <div class="col-sm-12">
                                     <label for="send_payment_id" class="col-xs-2 control-label">Payment ID</label>
                                     <div class="col-xs-10">
-                                        <input id="send_payment_id" type="text" class="form-control"  placeholder="Paste payment ID here (optional)..." maxlength="64"/>
+                                        <input id="send_payment_id" type="text" class="form-control"  placeholder="Paste payment ID here (Ctrl+V, optional)..." maxlength="64"/>
                                     </div>
                                 </div>
                             </div>
@@ -1206,8 +1386,6 @@ html ="""
                                 </form>
                             </div>
                             <div class="col-sm-12 wallet-settings" style="margin-top: 10px; text-align:center;">
-                                <!--<label style="color:#999;font-size:90%">1. Daemon settings will come effective next time you start wallet</label><br/>
-                                <label style="color:#999;font-size:90%">2. Daemon log-level above [0] shoud be set only for debugging purpose</label>-->
                                 <button id="btn_restart_daemon" type="button" class="btn btn-primary" onclick="restart_daemon()"><i class="fa fa-refresh"></i> Restart Daemon</button>
                                 <button id="btn_view_log" type="button" class="btn btn-primary" onclick="app_hub.view_daemon_log()"><i class="fa fa-file"></i> View Log...</button>
                             </div>
@@ -1262,6 +1440,21 @@ html ="""
             </div>
         </div>
         
+        <div class="modal" id="qrcode_dialog" style="z-index: 100003;">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="text-align:center" id="qrcode_dialog_body"></div>
+                    <div class="modal-footer">
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <script id="recent_tx_row_templ" type="x-tmpl-mustache">
             <div class="col-sm-12">
@@ -1330,6 +1523,30 @@ html ="""
                     <span aria-hidden="true">&raquo;</span>
                 </a>
             </li>
+        </script>
+        
+        <script id="new_subaddress_row_tmpl" type="x-tmpl-mustache">
+            <tr class="" style="font-weight: normal;color:#333;">
+                <td>{{ address_short }}</td>
+                <td align="right">{{ address_index }}</td>
+                <td align="right">
+                    <button class="btn btn-primary btn-sm" tabindex="-1" onclick="copy_subaddress(this, '{{ address }}')" data-toggle="tooltip" data-placement="bottom" data-trigger="manual" title="Address copied"><i class="fa fa-copy"></i></button>
+                    <button class="btn btn-primary btn-sm" tabindex="-1" onclick="show_qrcode('{{ address }}')" title="Show QR code"><i class="fa fa-qrcode"></i></button>    
+                </td>
+            </tr>
+        </script>
+        
+        <script id="used_subaddress_row_tmpl" type="x-tmpl-mustache">
+            <tr class="" style="font-weight:{{ row_font_weight }};color:#333;">
+                <td>{{ address_short }}</td>
+                <td align="right">{{ balance }}</td>
+                <td align="right">{{ unlocked_balance }}</td>
+                <td align="right">{{ address_index }}</td>
+                <td align="right">
+                    <button class="btn btn-primary btn-sm" tabindex="-1" onclick="copy_subaddress(this, '{{ address }}')" data-toggle="tooltip" data-placement="bottom" data-trigger="manual" title="Address copied"><i class="fa fa-copy"></i></button>
+                    <button class="btn btn-primary btn-sm" tabindex="-1" onclick="show_qrcode('{{ address }}')" title="Show QR code"><i class="fa fa-qrcode"></i></button>    
+                </td>
+            </tr>
         </script>
     </body>
 </html>

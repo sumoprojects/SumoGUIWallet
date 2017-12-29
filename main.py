@@ -24,7 +24,7 @@ file_hashes = [
         ('www/scripts/jquery.qrcode.min.js', 'f4ccf02b69092819ac24575c717a080c3b6c6d6161f1b8d82bf0bb523075032d'),
         ('www/scripts/utils.js', 'd0c6870ed19c92cd123c7443cb202c7629f9cd6807daed698485fda25214bdb4'),
         
-        ('www/css/bootstrap.min.css', '2e4ceda16bdb9f59b01ee01552e8a353ee7cc4e4ebac7d51413106094384ef37'),
+        ('www/css/bootstrap.min.css', '9d517cad6f1744ab5eba382ccf0f53969f7d326e1336a6c2771e82830bc2c5ac'),
         ('www/css/font-awesome.min.css', 'b8b02026a298258ce5069d7b6723c2034058d99220b6612b54bc0c5bf774dcfb'),
         
         ('www/css/fonts/fontawesome-webfont.ttf', '7b5a4320fba0d4c8f79327645b4b9cc875a2ec617a557e849b813918eb733499'),
@@ -40,7 +40,7 @@ def _check_file_integrity(app):
         if not os.path.exists(file_path):
             return False
         data = readFile(file_path)
-        #print( file_path, hashlib.sha256(data).hexdigest() )
+#         print( file_path, hashlib.sha256(data).hexdigest() )
         if hashlib.sha256(data).hexdigest() != file_hash:
             return False
         

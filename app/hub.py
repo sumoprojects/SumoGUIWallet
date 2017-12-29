@@ -36,7 +36,7 @@ from manager.ProcessManager import WalletCliManager
 wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
         
-password_regex = re.compile(r"^([a-zA-Z0-9!@#$%^&*]{6,128})$")
+password_regex = re.compile(r"^([a-zA-Z0-9!@#\$%\^&\*]{1,256})$")
 
 from webui import LogViewer
 
@@ -96,7 +96,7 @@ class Hub(QObject):
                 if not wallet_password:
                     QMessageBox.warning(self.new_wallet_ui, \
                             'Wallet Password',\
-                             "You must provide password to open wallet")
+                             "You must provide password to open the wallet")
                 else:
                     break
             else:
@@ -121,7 +121,7 @@ class Hub(QObject):
             if self.ui.wallet_rpc_manager.is_invalid_password():
                 QMessageBox.critical(self.new_wallet_ui, \
                         'Error Importing Wallet',\
-                        "Error: Provided wallet password is invalid!")
+                        "Error: Provided wallet password is not valid!")
                 self.ui.reset_wallet()
                 return False
             if not self.ui.wallet_rpc_manager.is_proc_running():
@@ -169,8 +169,8 @@ class Hub(QObject):
                     if not password_regex.match(wallet_password):
                         QMessageBox.warning(self.new_wallet_ui, \
                             'Wallet Password',\
-                             "Password must have at least 6 characters/numbers\
-                                        <br>or special characters: !@#$%^&*")
+                             "Password must contain at least 1 character [a-zA-Z] or number [0-9]\
+                                        <br>or special character like !@#$%^&* and not contain spaces")
                         continue
                     
                     confirm_password, result = self._custom_input_dialog(self.new_wallet_ui, \
@@ -258,6 +258,7 @@ class Hub(QObject):
             self.ui.wallet_info.is_loaded = True
             self.ui.run_wallet_rpc(wallet_password, 2)
             counter = 0
+            
             while not self.ui.wallet_rpc_manager.is_ready():
                 self.app_process_events(0.5)
                 if self.ui.wallet_rpc_manager.block_hex:
@@ -320,12 +321,20 @@ class Hub(QObject):
         self.on_wallet_rescan_bc_completed_event.emit()
     
         
-    @Slot(float, str, str, int, int, str, bool)
-    def send_tx(self, amount, address, payment_id, priority, mixin, tx_desc, save_address):
+    @Slot(float, str, str, int, int, str, bool, bool)
+    def send_tx(self, amount, address, payment_id, priority, mixin, tx_desc, save_address, sweep_all):
         if not payment_id and not address.startswith("Sumi"):
             result = QMessageBox.question(self.ui, "Sending Coins Without Payment ID?", \
                                       "Are you sure to send coins without Payment ID?", \
                                        QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
+            if result == QMessageBox.No:
+                self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Sending coin cancelled"}')
+                return
+            
+        if sweep_all:
+            result = QMessageBox.question(self.ui, "Sending all your coins?", \
+                                      "This will send all your coins to target address.<br><br>Are you sure you want to proceed?", \
+                                      QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
             if result == QMessageBox.No:
                 self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Sending coin cancelled"}')
                 return
@@ -343,8 +352,17 @@ class Hub(QObject):
             return
         
         amount = int(amount*COIN)
-        ret = self.ui.wallet_rpc_manager.rpc_request.transfer_split(amount, \
-                                            address, payment_id, priority, mixin)
+        
+        if sweep_all:
+            _, _, per_subaddress = self.ui.wallet_rpc_manager.rpc_request.get_balance()
+            subaddr_indices = []
+            for s in per_subaddress:
+                if s['unlocked_balance'] > 0:
+                    subaddr_indices.append(s['address_index'])
+            ret = self.ui.wallet_rpc_manager.rpc_request.transfer_all(address, payment_id, priority, mixin, 0, subaddr_indices)
+        else:  
+            ret = self.ui.wallet_rpc_manager.rpc_request.transfer_split(amount, \
+                                                address, payment_id, priority, mixin)            
          
         if ret['status'] == "ERROR":
             self.on_wallet_send_tx_completed_event.emit(json.dumps(ret));
@@ -371,9 +389,12 @@ class Hub(QObject):
                         
             msg = "<b>Coins successfully sent in the following transaction(s):</b><br><br>"
             for i in range(len(ret['tx_hash_list'])):
-                msg += "- Transaction ID: %s <br>  - Amount: %s <br>  - Fee: %s <br><br>" % (ret['tx_hash_list'][i], \
-                                                    print_money2(ret['amount_list'][i]), \
-                                                    print_money2(ret['fee_list'][i]))
+                if sweep_all:
+                    msg += "- Transaction ID: %s <br>" % (ret['tx_hash_list'][i])
+                else:
+                    msg += "- Transaction ID: %s <br>  - Amount: %s <br>  - Fee: %s <br><br>" % (ret['tx_hash_list'][i], \
+                                                        print_money2(ret['amount_list'][i]), \
+                                                        print_money2(ret['fee_list'][i]))
             QMessageBox.information(self.ui, 'Coins Sent', msg)
             self.ui.update_wallet_info()
             
@@ -594,6 +615,11 @@ class Hub(QObject):
         log_dialog = LogViewer(parent=self.ui, log_file=log_file)
         log_dialog.load_log()
         
+    @Slot()        
+    def paste_seed_words(self):
+        text = QApplication.clipboard().text()
+        self.on_paste_seed_words_event.emit(text)
+        
                 
     def update_daemon_status(self, status):
         self.on_daemon_update_status_event.emit(status)
@@ -603,6 +629,7 @@ class Hub(QObject):
         for _ in range(int(seconds*10)):
             self.app.processEvents()
             sleep(.1)
+        
     
             
     def _detail_error_msg(self, title, error_text, error_detailed_text):
@@ -636,7 +663,7 @@ class Hub(QObject):
         wallet_info['address'] = self.ui.wallet_info.wallet_address
         wallet_info['seed'] = wallet_rpc_request.query_key(key_type="mnemonic")
         wallet_info['view_key'] = wallet_rpc_request.query_key(key_type="view_key")
-        balance, unlocked_balance = wallet_rpc_request.get_balance()
+        balance, unlocked_balance, _ = wallet_rpc_request.get_balance()
         wallet_info['balance'] = print_money(balance)
         wallet_info['unlocked_balance'] = print_money(unlocked_balance)
         
@@ -661,3 +688,5 @@ class Hub(QObject):
     on_view_wallet_key_completed_event = Signal(str, str)
     on_load_app_settings_completed_event = Signal(str)
     on_restart_daemon_completed_event = Signal()
+    on_paste_seed_words_event = Signal(str)
+    

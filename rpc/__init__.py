@@ -136,18 +136,30 @@ class WalletRPCRequest():
             return res['key']
         return res['status']
         
-    def get_address(self):
-        rpc_input = {"method":"getaddress"}
+    def get_address(self, account_index = 0):
+        params = {"account_index": account_index}
+        rpc_input = {"method": "getaddress",
+                     "params": params}
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
-            return res['address']
+            return res
+        return res['status']
+    
+    def create_address(self):
+        rpc_input = {"method":"create_address"}
+        res = self.send_request(rpc_input)
+        if res['status'] == 'OK':
+            return res
         return res['status']
     
     def get_balance(self):
         rpc_input = {"method":"getbalance"}
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
-            return (res['balance'], res['unlocked_balance'])
+            per_subaddress = []
+            if 'per_subaddress' in res:
+                per_subaddress = res['per_subaddress']
+            return (res['balance'], res['unlocked_balance'], per_subaddress)
         return (0, 0)
     
     def get_transfers(self, filter_by_height=False, min_height=0, max_height=0, tx_in=True, tx_out=True, tx_pending=False, tx_in_pool=False):
@@ -180,6 +192,21 @@ class WalletRPCRequest():
         if payment_id:
             params["payment_id"] = payment_id
         
+        rpc_input["params"] = params
+        return self.send_request(rpc_input)
+    
+    def transfer_all(self, address, payment_id, priority, mixin, account_index=0, subaddr_indices=[0]):
+        rpc_input = {"method": "sweep_all"}
+        params = {
+            "address": address,
+            "account_index": account_index,
+            "subaddr_indices": subaddr_indices,
+            "priority": priority,
+            "mixin": mixin
+        }
+        if payment_id:
+            params["payment_id"] = payment_id
+            
         rpc_input["params"] = params
         return self.send_request(rpc_input)
     
