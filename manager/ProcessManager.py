@@ -46,8 +46,9 @@ class ProcessManager(Thread):
             self.proc.stdout.close()
             
     def send_command(self, cmd):
-        self.proc.stdin.write( (cmd + "\n").encode("utf-8") )
+        self.proc.stdin.write( (cmd + u"\n").encode("utf-8") )
         sleep(0.1)
+    
         
     def stop(self):
         if self.is_proc_running():

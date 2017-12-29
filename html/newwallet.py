@@ -18,6 +18,9 @@ html ="""
                 app_hub.on_new_wallet_show_info_event.connect(show_wallet_info);
                 app_hub.on_new_wallet_ui_reset_event.connect(reset_ui);
                 app_hub.on_new_wallet_update_processed_block_height_event.connect(update_processed_block_height);
+                app_hub.on_paste_seed_words_event.connect(function(text){
+                    $('#seed').val(text);
+                });
             }
             
             function create_new_wallet(){
@@ -82,6 +85,11 @@ html ="""
                 $('#processed_block_height').html(height);
             }
             
+            function paste_seed(){
+                app_hub.paste_seed_words();
+                return false;
+            }
+            
         </script>
         <link href="./css/bootstrap.min.css" rel="stylesheet">
         <link href="./css/font-awesome.min.css" rel="stylesheet">
@@ -101,7 +109,7 @@ html ="""
                 background-color: #666;
                 color: #76A500;
                 background-position: center center;
-                font-family: "RoboReg", "Helvetica Neue",Helvetica,Arial,sans-serif;
+                font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
                 font-size: 14px;
                 margin: 0;
                 padding: 0;
@@ -235,8 +243,8 @@ html ="""
                     <div class="col-sm-12">
                         <h4>Restore Wallet</h4>
                         <div class="form-group">
-                            <label for="seed">Mnemonic Seed:</label>
-                            <textarea id="seed" class="form-control" placeholder="Paste mnemonic seed (26 words) here" style="height:80px;margin-bottom:10px;font-size:100%"></textarea>
+                            <label for="seed">Mnemonic Seed:</label>    <button id="paste_seed_btn" type="button" class="btn btn-warning btn-sm" style="text-transform: none" onclick="paste_seed()"><i class="fa fa-paste"></i> Paste</button>
+                            <textarea id="seed" class="form-control" placeholder="Paste 26 mnemonic seed words here (use [Paste] button above or press Ctrl+V)" style="height:80px;margin-bottom:10px;margin-top:10px;font-size:100%"></textarea>
                             <button id="restore_wallet_btn" type="button" class="btn btn-primary" onclick="restore_wallet()"><i class="fa fa-undo"></i> Restore</button>
                         </div>
                     </div>

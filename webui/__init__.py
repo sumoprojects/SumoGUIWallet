@@ -36,6 +36,9 @@ from html import index, newwallet
 
 import psutil
 
+TIMER2_INTERVAL = 60000
+MAX_NEW_SUBADDRESSES = 10
+
 log_text_tmpl = """
 <index>
     <head>
@@ -88,7 +91,7 @@ class BaseWebUI(QMainWindow):
         self.debug = debug
         self.html = html
         self.url = "file:///" \
-            + os.path.join(self.app.property("ResPath"), "www/").replace('\\', '/')
+            + os.path.join(self.app.property("ResPath"), "www/index.html").replace('\\', '/')
         
         
         self.is_first_load = True
@@ -226,9 +229,12 @@ class MainWebUI(BaseWebUI):
         
     def show_wallet(self):
         QTimer.singleShot(1000, self.update_wallet_info)
-        self.timer2 = QTimer(self)
-        self.timer2.timeout.connect(self.update_wallet_info)
-        self.timer2.start(10000)
+        if not hasattr(self, "timer2"):
+            self.timer2 = QTimer(self)
+            self.timer2.timeout.connect(self.update_wallet_info)
+        
+        self.timer2.stop()
+        self.timer2.start(TIMER2_INTERVAL)
         self.show()
         
     
@@ -278,10 +284,9 @@ class MainWebUI(BaseWebUI):
         
         wallet_info = {}
         try:
-            balance, unlocked_balance = self.wallet_rpc_manager.rpc_request.get_balance()
+            balance, unlocked_balance, per_subaddress = self.wallet_rpc_manager.rpc_request.get_balance()
             wallet_info['balance'] = balance/COIN
             wallet_info['unlocked_balance'] = unlocked_balance/COIN
-            wallet_info['address'] = self.wallet_info.wallet_address
             if self.wallet_info.bc_height < self.current_height:
                 max_height = self.current_height if self.current_height > 0 else 0x7fffffff
                 min_height = self.wallet_info.top_tx_height
@@ -341,6 +346,42 @@ class MainWebUI(BaseWebUI):
                     tx["confirmation"] = self.target_height - tx["height"] if self.target_height > tx["height"] else 0
                     wallet_info["recent_txs"].append(tx)
             
+            adddress_info = self.wallet_rpc_manager.rpc_request.get_address()
+            wallet_info['address'] = adddress_info['address']
+            wallet_info['used_subaddresses'] = []
+            wallet_info['new_subaddresses'] = []
+            for subaddress in adddress_info['addresses']:
+                if subaddress['used']:
+                    wallet_info['used_subaddresses'].append(subaddress)
+                    # update subaddress balance
+                    subaddress['balance'] = 0.
+                    subaddress['unlocked_balance'] = 0.
+                    for s in per_subaddress:
+                        if s['address_index'] == subaddress['address_index']:
+                            subaddress['balance'] = s['balance']/COIN
+                            subaddress['unlocked_balance'] = s['unlocked_balance']/COIN
+                            break
+                else:
+                    if subaddress['address_index'] > 0:
+                        wallet_info['new_subaddresses'].append(subaddress)
+                    
+            wallet_info['used_subaddresses'] = sorted(wallet_info['used_subaddresses'], 
+                                                      key=lambda k:k['balance'], 
+                                                      reverse=True)
+            
+            # auto-generate new subaddresses if not enough available
+            if len(wallet_info['new_subaddresses']) < MAX_NEW_SUBADDRESSES:
+                for _ in range(MAX_NEW_SUBADDRESSES - len(wallet_info['new_subaddresses'])):
+                    new_subaddress = self.wallet_rpc_manager.rpc_request.create_address()
+                    new_subaddress['label'] = ""
+                    new_subaddress['used'] = False
+                    wallet_info['new_subaddresses'].append(new_subaddress)
+            
+            if len(wallet_info['new_subaddresses']) > MAX_NEW_SUBADDRESSES:
+                wallet_info['new_subaddresses'] = wallet_info['new_subaddresses'][0:MAX_NEW_SUBADDRESSES]
+                        
+#             print(json.dumps(wallet_info, indent=4))
+            
             self.hub.on_wallet_update_info_event.emit(json.dumps(wallet_info))
         except Exception, err:
             log(str(err), LEVEL_ERROR)
@@ -394,14 +435,16 @@ class MainWebUI(BaseWebUI):
                     break
                 
             if not wallet_password:
-#                 self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
-#                 self.hub.setNewWalletUI(self.new_wallet_ui)
-#                 self.new_wallet_ui.run()
-                
-                self.close()
+                result = QMessageBox.question(self, "Create/Restore Wallet?", \
+                            "Do you want to create (or restore to) a new wallet instead?", \
+                            QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
+                if result == QMessageBox.No:
+                    self.close()
+                else:
+                    self.show_new_wallet_ui()
                 return
             else:
-                self.run_wallet_rpc(wallet_password, 0)
+                self.run_wallet_rpc(wallet_password, 2)
                 while not self.wallet_rpc_manager.is_ready():
                     self.hub.app_process_events(0.5)
                     if self.wallet_rpc_manager.is_invalid_password():
@@ -413,9 +456,12 @@ class MainWebUI(BaseWebUI):
                 
                 self.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
                 self.update_wallet_info()
-                self.timer2 = QTimer(self)
-                self.timer2.timeout.connect(self.update_wallet_info)
-                self.timer2.start(15000)
+                if not hasattr(self, "timer2"):
+                    self.timer2 = QTimer(self)
+                    self.timer2.timeout.connect(self.update_wallet_info)
+                
+                self.timer2.stop()
+                self.timer2.start(TIMER2_INTERVAL)
         else:
             self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
             self.hub.setNewWalletUI(self.new_wallet_ui)
