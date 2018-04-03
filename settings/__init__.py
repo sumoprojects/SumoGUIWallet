@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
+## Copyright (c) 2017-2018, The Sumokoin Project (www.sumokoin.org)
 '''
 App top-level settings
 '''
@@ -14,8 +14,8 @@ import logging
 from utils.common import getHomeDir, makeDir
 
 USER_AGENT = "Sumokoin GUI Wallet"
-APP_NAME = "Sumokoin Wallet"
-VERSION = [0, 0, 1]
+APP_NAME = "Sumokoin GUI Wallet"
+VERSION = [0, 0, 3]
 
 
 _data_dir = makeDir(os.path.join(getHomeDir(), 'SumokoinGUIWallet'))

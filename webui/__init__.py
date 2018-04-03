@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
+## Copyright (c) 2017-2018, The Sumokoin Project (www.sumokoin.org)
 '''
 App UIs
 '''
@@ -28,6 +28,11 @@ from settings import APP_NAME, USER_AGENT, VERSION, COIN
 from utils.logger import log, LEVEL_DEBUG, LEVEL_ERROR, LEVEL_INFO
 from utils.common import readFile
 
+from utils.notify import Notify
+MSG_TYPE_INFO = 1
+MSG_TYPE_WARNING = 2
+MSG_TYPE_CRITICAL = 3
+
 from manager.ProcessManager import SumokoindManager, WalletRPCManager
 from rpc import RPCRequest, DaemonRPCRequest
 
@@ -38,6 +43,7 @@ import psutil
 
 TIMER2_INTERVAL = 60000
 MAX_NEW_SUBADDRESSES = 10
+tray_icon_tooltip = "%s v%d.%d.%s" % (APP_NAME, VERSION[0], VERSION[1], VERSION[2])
 
 log_text_tmpl = """
 <index>
@@ -177,6 +183,17 @@ class MainWebUI(BaseWebUI):
         self.agent = '%s v.%s' % (USER_AGENT, '.'.join(str(v) for v in VERSION))
         log("Starting [%s]..." % self.agent, LEVEL_INFO)
         
+        # Setup the system tray icon
+        if sys.platform == 'darwin':
+            tray_icon = 'sumokoin_16x16_mac.png'
+        elif sys.platform == "win32":
+            tray_icon = 'sumokoin_16x16.png'
+        else:
+            tray_icon = 'sumokoin_32x32_ubuntu.png'
+        
+        self.trayIcon = QSystemTrayIcon(self._getQIcon(tray_icon))
+        self.trayIcon.setToolTip(tray_icon_tooltip)
+        
         self.app = app
         self.debug = debug
         self.hub = hub
@@ -199,8 +216,47 @@ class MainWebUI(BaseWebUI):
         self.target_height = self.app_settings.settings['blockchain']['height']
         self.current_height = 0
         
+        # Setup the tray icon context menu
+        self.trayMenu = QMenu()
+        
+        self.showAppAction = QAction('&Show %s' % APP_NAME, self)
+        f = self.showAppAction.font()
+        f.setBold(True)
+        self.showAppAction.setFont(f)
+        self.trayMenu.addAction(self.showAppAction)
         
         
+        self.aboutAction = QAction('&About...', self)
+        self.trayMenu.addAction(self.aboutAction)
+        
+        self.trayMenu.addSeparator()
+        self.exitAction = QAction('&Exit', self)
+        self.trayMenu.addAction(self.exitAction)
+        # Add menu to tray icon
+        self.trayIcon.setContextMenu(self.trayMenu)
+              
+        # connect signals
+        self.trayIcon.activated.connect(self._handleTrayIconActivate)
+        self.exitAction.triggered.connect(self.handleExitAction)
+        self.aboutAction.triggered.connect(self.handleAboutAction)
+        self.showAppAction.triggered.connect(self._handleShowAppAction)
+        self.app.aboutToQuit.connect(self._handleAboutToQuit)
+        
+        # Setup notification support
+        self.system_tray_running_notified = False
+        self.notifier = Notify(APP_NAME)
+        self.trayIcon.show()
+        
+    
+    def closeEvent(self, event):
+        """ Override QT close event
+        """
+        event.ignore()
+        self.hide()
+        if not self.system_tray_running_notified:
+            self.notify("%s is still running at system tray." % APP_NAME, 
+                                                        "Running Status")
+            self.system_tray_running_notified = True
     
     def run(self):
         self.view.loadFinished.connect(self.load_finished)
@@ -236,7 +292,12 @@ class MainWebUI(BaseWebUI):
         self.timer2.stop()
         self.timer2.start(TIMER2_INTERVAL)
         self.show()
+        self.trayIcon.show()
         
+    
+    def hide_wallet(self):
+        self.hide()
+        self.trayIcon.hide()   
     
     def run_wallet_rpc(self, wallet_password, log_level=0):
         # first, try to stop any wallet RPC server running
@@ -276,6 +337,13 @@ class MainWebUI(BaseWebUI):
             }
         
         self.hub.update_daemon_status(json.dumps(info))
+        
+        sync_status = "Disconnected" if sumokoind_info['status'] != "OK" else "Synchronizing..."
+        if sumokoind_info['status'] == "OK" and self.current_height == self.target_height:
+            sync_status = "Network synchronized"
+        
+        self.trayIcon.setToolTip("%s\n%s (%d/%d)" % (tray_icon_tooltip, sync_status,
+                                               self.current_height, self.target_height))
     
     
     def update_wallet_info(self):
@@ -389,7 +457,7 @@ class MainWebUI(BaseWebUI):
     
     def show_new_wallet_ui(self):
         self.reset_wallet(delete_files=False)
-        self.hide()
+        self.hide_wallet()
         self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
         self.hub.setNewWalletUI(self.new_wallet_ui)
         self.new_wallet_ui.run()
@@ -413,9 +481,32 @@ class MainWebUI(BaseWebUI):
             self.hub.on_new_wallet_ui_reset_event.emit()
         self.hub.on_main_wallet_ui_reset_event.emit()
         
+    def notify(self, message, title="", icon=None, msg_type=None):
+        if self.notifier.notifier is not None:
+            self.notifier.notify(title, message, icon)
+        else:
+            self.showMessage(message, title, msg_type)
+
+    def showMessage(self, message, title="", msg_type=None, timeout=2000):
+        """Displays 'message' through the tray icon's showMessage function,
+        with title 'title'. 'type' is one of the enumerations of
+        'common.MessageTypes'.
+        """
+        if msg_type is None or msg_type == MSG_TYPE_INFO:
+            icon = QSystemTrayIcon.Information
+
+        elif msg_type == MSG_TYPE_WARNING:
+            icon = QSystemTrayIcon.Warning
+
+        elif msg_type == MSG_TYPE_CRITICAL:
+            icon = QSystemTrayIcon.Critical
+        
+        title = "%s - %s" % (APP_NAME, title) if title else APP_NAME
+        self.trayIcon.showMessage(title, message, icon, timeout)
+        
     def about(self):
         QMessageBox.about(self, "About", \
-            u"%s <br><br>Copyright© 2017 - Sumokoin Projects (www.sumokoin.org)" % self.agent)
+            u"%s <br><br>Copyright© 2017 -2018 - Sumokoin Projects (www.sumokoin.org)" % self.agent)
     
     def _load_wallet(self):
         if self.wallet_info.load():
@@ -439,7 +530,8 @@ class MainWebUI(BaseWebUI):
                             "Do you want to create (or restore to) a new wallet instead?", \
                             QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
                 if result == QMessageBox.No:
-                    self.close()
+                    self.trayIcon.hide()
+                    QTimer.singleShot(250, self.app.quit)
                 else:
                     self.show_new_wallet_ui()
                 return
@@ -463,12 +555,37 @@ class MainWebUI(BaseWebUI):
                 self.timer2.stop()
                 self.timer2.start(TIMER2_INTERVAL)
         else:
+            self.hide_wallet()
             self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
             self.hub.setNewWalletUI(self.new_wallet_ui)
             self.new_wallet_ui.run()
+            
+    def _handleTrayIconActivate(self, reason):
+        if reason == QSystemTrayIcon.DoubleClick:
+            self.showNormal()
+            self.activateWindow()
+        
+    def handleExitAction(self, show_confirmation=True):
+        reply = QMessageBox.No
+        if show_confirmation:
+            self._handleShowAppAction()
+            reply=QMessageBox.question(self,'Exit %s?' % APP_NAME,
+                    "Are you sure to exit %s?" % APP_NAME, QMessageBox.Yes,QMessageBox.No)
+        if not show_confirmation or reply==QMessageBox.Yes:
+            self.trayIcon.hide()
+            QTimer.singleShot(250, self.app.quit)
+    
+    def _handleShowAppAction(self):
+        self.showNormal()
+        self.activateWindow()
+        
+    def handleAboutAction(self):
+        self._handleShowAppAction()
+        self.about()
         
     
     def _handleAboutToQuit(self):
+        self.hide_wallet()
         log("%s is about to quit..." % APP_NAME, LEVEL_INFO)
         if hasattr(self, "timer"):
             self.timer.stop()
