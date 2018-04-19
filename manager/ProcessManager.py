@@ -2,14 +2,11 @@
 # -*- coding: utf-8 -*-
 ## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 
-from __future__ import print_function
-
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 '''
 Process managers for sumokoind, sumo-wallet-cli and sumo-wallet-rpc
 '''
+
+from __future__ import print_function
 
 import sys, os
 import re
@@ -105,27 +102,38 @@ class SumokoindManager(ProcessManager):
 class WalletCliManager(ProcessManager):
     fail_to_connect_str = "wallet failed to connect to daemon"
     
-    def __init__(self, resources_path, wallet_file_path, wallet_log_path, restore_wallet=False):
+    def __init__(self, resources_path, wallet_file_path, wallet_log_path, restore_wallet=False, restore_height=0):
         if not restore_wallet:
             wallet_args = u'%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' \
                                                 % (resources_path, wallet_file_path, wallet_log_path)
         else:
-            wallet_args = u'%s/bin/sumo-wallet-cli --log-file=%s --daemon-port 19735 --restore-deterministic-wallet' \
-                                                % (resources_path, wallet_log_path)
+            wallet_args = u'%s/bin/sumo-wallet-cli --log-file=%s --restore-deterministic-wallet --restore-height %d' \
+                                                % (resources_path, wallet_log_path, restore_height)
         ProcessManager.__init__(self, wallet_args, "sumo-wallet-cli")
         self.ready = Event()
         self.last_error = ""
+        self.block_height = 0
+        self.top_height = 0
         
     def run(self):
+        height_regex = re.compile(r"Height (\d+) / (\d+)")
         is_ready_str = "Background refresh thread started"
         err_str = "Error:"
         for line in iter(self.proc.stdout.readline, b''):
+            m_height = height_regex.search(line)
+            if m_height: 
+                self.block_height = int(m_height.group(1))
+                self.top_height = int(m_height.group(2))
+            
             if not self.ready.is_set() and is_ready_str in line:
                 self.ready.set()
-                log("Wallet ready!", LEVEL_INFO, self.proc_name)
+                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_INFO, self.proc_name)
+                log("[%s]>>> %s" % (self.proc_name, "Wallet ready!") , LEVEL_INFO, self.proc_name)
             elif err_str in line:
                 self.last_error = line.rstrip()
                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
+            elif m_height:
+                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_INFO, self.proc_name)
 #             else:
 #                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
         
@@ -145,7 +153,7 @@ class WalletCliManager(ProcessManager):
 
 
 class WalletRPCManager(ProcessManager):
-    def __init__(self, resources_path, wallet_file_path, wallet_password, app, log_level=2):
+    def __init__(self, resources_path, wallet_file_path, wallet_password, app, log_level=1):
         self.user_agent = str(uuid4().hex)
         wallet_log_path = os.path.join(os.path.dirname(wallet_file_path), "sumo-wallet-rpc.log")
         wallet_rpc_args = u'%s/bin/sumo-wallet-rpc --wallet-file %s --log-file %s --rpc-bind-port 19736 --user-agent %s --log-level %d' \
@@ -157,39 +165,52 @@ class WalletRPCManager(ProcessManager):
         
         self.rpc_request = WalletRPCRequest(app, self.user_agent)
 #         self.rpc_request.start()
-        self.ready = False
-        self.block_hex = None
+        self._ready = False
         self.block_height = 0
-        self.is_password_invalid = Event() 
+        self.is_password_invalid = Event()
+        self.last_log_lines = []
     
     def run(self):
-        is_ready_str = "Run net_service loop"
+        is_ready_str = "Starting wallet rpc server"
         err_str = "ERROR"
         invalid_password = "invalid password"
         height_regex = re.compile(r"Processed block: \<([a-z0-9]+)\>, height (\d+)")
+        height_regex2 = re.compile(r"Skipped block by height: (\d+)")
+        height_regex3 = re.compile(r"Skipped block by timestamp, height: (\d+)")
         
         for line in iter(self.proc.stdout.readline, b''):
-            if not self.ready and is_ready_str in line:
-                self.ready = True
-                log("Wallet RPC ready!", LEVEL_INFO, self.proc_name)
+            m_height = height_regex.search(line)
+            if m_height: self.block_height = m_height.group(2)
+            if not m_height:
+                m_height = height_regex2.search(line)
+                if m_height: self.block_height = m_height.group(1)
+            if not m_height:
+                m_height = height_regex3.search(line)
+                if m_height: self.block_height = m_height.group(1)
+                
+            if not self._ready and is_ready_str in line:
+                self._ready = True
+                log(line.rstrip(), LEVEL_INFO, self.proc_name)
             elif err_str in line:
                 self.last_error = line.rstrip()
-                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
+                log(line.rstrip(), LEVEL_ERROR, self.proc_name)
                 if not self.is_password_invalid.is_set() and invalid_password in self.last_error:
                     self.is_password_invalid.set()
+            elif m_height:
+                log(line.rstrip(), LEVEL_INFO, self.proc_name)
             else:
-                log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
+                log(line.rstrip(), LEVEL_DEBUG, self.proc_name)
             
-            m_height = height_regex.search(line)
-            if m_height:
-                self.block_hex = m_height.group(1)
-                self.block_height = m_height.group(2)
+            if len(self.last_log_lines) > 1:
+                self.last_log_lines.pop(0)
+            self.last_log_lines.append(line.rstrip())
+            
         
         if not self.proc.stdout.closed:
-            self.proc.stdout.close()    
+            self.proc.stdout.close()
             
     def is_ready(self):
-        return self.ready
+        return self._ready
     
     def is_invalid_password(self):
         return self.is_password_invalid.is_set()
@@ -209,6 +230,6 @@ class WalletRPCManager(ProcessManager):
                         break
                 else:
                     break
-        self.ready = False
+        self._ready = False
         log("[%s] stopped" % self.proc_name, LEVEL_INFO, self.proc_name)        
         
