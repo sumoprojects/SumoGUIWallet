@@ -572,6 +572,7 @@ class MainWebUI(BaseWebUI):
             reply=QMessageBox.question(self,'Exit %s?' % APP_NAME,
                     "Are you sure to exit %s?" % APP_NAME, QMessageBox.Yes,QMessageBox.No)
         if not show_confirmation or reply==QMessageBox.Yes:
+            self.hide()
             self.trayIcon.hide()
             QTimer.singleShot(250, self.app.quit)
     

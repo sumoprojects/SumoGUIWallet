@@ -370,6 +370,10 @@ html ="""
                 background-color: #5BB0F7;
             }
             
+            .modal-progress-subtext{
+                text-align: center;
+            }
+            
         </style>
         
         <script src="./scripts/jquery-1.9.1.min.js"></script>
@@ -599,6 +603,25 @@ html ="""
                 app_hub.on_restart_daemon_completed_event.connect(function(){
                     hide_progress();
                 });
+                
+                setInterval(function(){
+                    app_hub.update_wallet_loading_height();
+                }, 1000);
+                
+                app_hub.on_update_wallet_loading_height_event.connect(function(height, target_height){
+                    //console.log(height);
+                    if(height < target_height){
+                        if($('#app_modal_progress').is(':visible')){
+                            msg = "Processing block# " + height;
+                            if( target_height > 0 ) msg += "/" + target_height;
+                            $('#app_modal_progress_subtext').html(msg);
+                            $('#app_modal_progress_subtext').show();
+                        }
+                    }
+                    else{
+                        $('#app_modal_progress_subtext').hide();
+                    }
+                });
             }
             
             function delete_address(index){
@@ -797,7 +820,7 @@ html ="""
             function rescan_bc(){
                 rescan_spent_btn.disable(true);
                 rescan_bc_btn.disable(true);
-                show_progress("Rescan blockchain...");
+                show_app_progress("Rescan blockchain...");
                 app_hub.rescan_bc();
                 return false;
             }
@@ -1434,7 +1457,8 @@ html ="""
                     <div class="modal-body">
                         <p><span id="app_modal_progress_text" class="modal-progress-text"></span><p>
                         <!--<p style="text-align: center"><img src="./images/ajax-loader2.gif"/></p>-->
-                        <p style="text-align: center"><i class="fa fa-spinner fa-pulse fa-2x fa-fw"></i></p> 
+                        <p style="text-align: center"><i class="fa fa-spinner fa-pulse fa-2x fa-fw"></i></p>
+                        <div id="app_modal_progress_subtext" class="modal-progress-subtext"> </div>
                     </div>
                 </div>
             </div>
