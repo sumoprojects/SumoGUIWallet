@@ -15,7 +15,7 @@ from utils.common import getHomeDir, makeDir
 
 USER_AGENT = "Sumokoin GUI Wallet"
 APP_NAME = "Sumokoin GUI Wallet"
-VERSION = [0, 0, 4]
+VERSION = [0, 0, 5]
 
 
 _data_dir = makeDir(os.path.join(getHomeDir(), 'SumokoinGUIWallet'))
