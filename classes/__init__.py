@@ -81,17 +81,35 @@ class WalletInfo():
         self.bc_height = -1
         
         
+def set_default_settings(default_settings, settings):
+    for k, v in default_settings.iteritems():
+        settings.setdefault(k, v)
+        if type(v) is dict: set_default_settings(default_settings[k], settings[k])
+        
 class AppSettings():
-    settings = {
+    settings = {}
+    default_settings = {
         "daemon": {
             "log_level": 0,
-            "block_sync_size": 10
+            "block_sync_size": 10,
+            "limit_rate_up": 2048,
+            "limit_rate_down": 8192,
         },
         
         "blockchain": {
             "height": 0,
+        },
+                
+        "application": {
+            "minimize_to_tray": False,
         }
     }
+    
+    log_levels = [0,1,2,3,4]
+    block_sync_sizes = [10,20,50,100,200]
+    limit_rate_ups = [512,1024,2048,3072,4096,8192,16384]
+    limit_rate_downs = [512,1024,2048,4096,8192,12288,16384]
+    
     
     def __init__(self):
         self.app_settings_filepath = os.path.join(config_path, 'app_settings.json')
@@ -101,12 +119,36 @@ class AppSettings():
         if os.path.exists(self.app_settings_filepath):
             try:
                 self.settings = json.loads(readFile(self.app_settings_filepath))
-                return True
             except Exception, err:
-                log("[AppSettings]>>> Load error:" + str(err), LEVEL_ERROR)
-                return False
-        return False
-    
+                log("[AppSettings]>>> Load config file error:" + str(err), LEVEL_ERROR)
+                
+        # Set default values:
+        set_default_settings(self.default_settings, self.settings)
+        
+        # Validate values
+        if self.settings["daemon"]["log_level"] not in self.log_levels:
+            self.settings["daemon"]["log_level"] = self.default_settings["daemon"]["log_level"]
+            
+        if self.settings["daemon"]["block_sync_size"] not in self.block_sync_sizes:
+            self.settings["daemon"]["block_sync_size"] = self.default_settings["daemon"]["block_sync_size"]
+            
+        if self.settings["daemon"]["limit_rate_up"] not in self.limit_rate_ups:
+            self.settings["daemon"]["limit_rate_up"] = self.default_settings["daemon"]["limit_rate_up"]
+            
+        if self.settings["daemon"]["limit_rate_down"] not in self.limit_rate_downs:
+            self.settings["daemon"]["limit_rate_down"] = self.default_settings["daemon"]["limit_rate_down"]
+        
+        try:
+            self.settings["blockchain"]["height"] = abs(int(self.settings["blockchain"]["height"]))
+        except:
+            self.settings["blockchain"]["height"] = self.default_settings["blockchain"]["height"]
+        
+        try:
+            self.settings["application"]["minimize_to_tray"] = bool(self.settings["application"]["minimize_to_tray"])
+        except:
+            self.settings["application"]["minimize_to_tray"] = self.default_settings["application"]["minimize_to_tray"]
+            
+        
     def save(self):
         try:
             writeFile(self.app_settings_filepath, \

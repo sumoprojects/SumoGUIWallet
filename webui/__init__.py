@@ -247,10 +247,21 @@ class MainWebUI(BaseWebUI):
         self.notifier = Notify(APP_NAME)
         self.trayIcon.show()
         
+        self.close_to_system_tray = self.app_settings.settings['application']['minimize_to_tray']
     
     def closeEvent(self, event):
         """ Override QT close event
         """
+        if not self.close_to_system_tray:
+            reply=QMessageBox.question(self,'Exit %s?' % APP_NAME,
+                    "Are you sure to exit %s?" % APP_NAME, \
+                    QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                self.hide_wallet()
+            else:
+                event.ignore()
+            return
+        
         event.ignore()
         self.hide()
         if not self.system_tray_running_notified:
@@ -278,7 +289,9 @@ class MainWebUI(BaseWebUI):
         #start sumokoind daemon
         self.sumokoind_daemon_manager = SumokoindManager(self.app.property("ResPath"), 
                                             self.app_settings.settings['daemon']['log_level'], 
-                                            self.app_settings.settings['daemon']['block_sync_size'])
+                                            self.app_settings.settings['daemon']['block_sync_size'],
+                                            self.app_settings.settings['daemon']['limit_rate_up'],
+                                            self.app_settings.settings['daemon']['limit_rate_down'])
         
         self.sumokoind_daemon_manager.start()
         

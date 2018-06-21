@@ -678,6 +678,23 @@ class Hub(QObject):
         if h > self.current_block_height:
             self.on_update_wallet_loading_height_event.emit(h, self.ui.target_height)
             self.current_block_height = h
+            
+    @Slot(bool)
+    def change_minimize_to_tray(self, status):
+        self.ui.close_to_system_tray = status
+        self.ui.app_settings.settings['application']['minimize_to_tray'] = status
+        self.ui.app_settings.save()
+        
+    @Slot(int)
+    def change_limit_rate_up(self, limit_rate_up):
+        self.ui.app_settings.settings['daemon']['limit_rate_up'] = limit_rate_up
+        self.ui.app_settings.save()
+        
+    
+    @Slot(int)
+    def change_limit_rate_down(self, limit_rate_down):
+        self.ui.app_settings.settings['daemon']['limit_rate_down'] = limit_rate_down
+        self.ui.app_settings.save()
         
                 
     def update_daemon_status(self, status):

@@ -89,7 +89,7 @@ html ="""
             
             #settings_tab h3{
                 margin-top: 20px;
-                margin-bottom: 30px;
+                margin-bottom: 20px;
             }
             
             .syncing{
@@ -374,6 +374,10 @@ html ="""
                 text-align: center;
             }
             
+            #speed_limit_form select {
+                font-size: 14px;
+            }
+            
         </style>
         
         <script src="./scripts/jquery-1.9.1.min.js"></script>
@@ -391,6 +395,11 @@ html ="""
                     $('#daemon_log_level_' + log_level).prop('checked', true);
                     var block_sync_size = app_settings['daemon']['block_sync_size'];
                     $('#block_sync_size_' + block_sync_size).prop('checked', true);
+                    
+                    $('#minimize_to_tray_chk').prop('checked', app_settings['application']['minimize_to_tray']);
+                    
+                    $('#up_speed_limit_select').val(app_settings['daemon']['limit_rate_up']);
+                    $('#down_speed_limit_select').val(app_settings['daemon']['limit_rate_down']);
                 });
                 
                 app_hub.on_main_wallet_ui_reset_event.connect(function(){
@@ -754,7 +763,7 @@ html ="""
                         var row_rendered = Mustache.render(new_subaddress_row_tmpl, 
                             {   'address_index': subaddress['address_index'],
                                 'address' : subaddress['address'],
-                                'address_short' : subaddress['address'].substr(0, 70) + '...'
+                                'address_short' : subaddress['address'].substr(0, 60) + '...'
                             });
                         
                             
@@ -772,7 +781,7 @@ html ="""
                         var row_rendered = Mustache.render(used_subaddress_row_tmpl, 
                             {   'address_index': subaddress['address_index'],
                                 'address' : subaddress['address'],
-                                'address_short' : subaddress['address'].substr(0, 40) + '...',
+                                'address_short' : subaddress['address'].substr(0, 30) + '...',
                                 'balance': subaddress['balance'],
                                 'unlocked_balance': subaddress['unlocked_balance'],
                                 'row_font_weight': subaddress['address_index'] == 0 ? 'bold' : 'normal'
@@ -1086,6 +1095,18 @@ html ="""
                         }, 1);
                     }
                 });
+                
+                $("#minimize_to_tray_chk").change(function() {
+                    app_hub.change_minimize_to_tray(this.checked);
+                });
+                
+                $('#up_speed_limit_select').on('change', function(e) {
+                    app_hub.change_limit_rate_up(this.value);
+                });
+                
+                $('#down_speed_limit_select').on('change', function(e) {
+                    app_hub.change_limit_rate_down(this.value);
+                });
             });
         </script>
     </head>
@@ -1326,15 +1347,15 @@ html ="""
                             <button id="btn_view_spendkey" type="button" class="btn btn-primary" onclick="view_wallet_key('spend_key')"><i class="fa fa-key"></i> Spendkey...</button>
                         </div>
                     </div>
-                    <hr style="margin-top:20px;margin-bottom:10px;">
-                    <h3>DAEMON</h3>
+                    <hr style="margin-top:10px;margin-bottom:10px;">
+                    <h3 style="margin-bottom:10px">DAEMON</h3>
                     <div class="row">
                         <div class="col-lg-12">
-                            <div class="col-sm-5">
+                            <div class="col-sm-4">
                                 <form class="form-horizontal">
                                     <div class="form-group">
-                                        <label class="col-xs-4 control-label">Log level:</label>
-                                        <div class="col-xs-8">
+                                        <label class="col-xs-12 control-label">Log level:</label>
+                                        <div class="col-xs-12">
                                             <div class="radio">
                                               <label>
                                                 <input type="radio" name="daemon_log_level" id="daemon_log_level_0" value="0" onclick="set_daemon_log_level(0)" checked="">
@@ -1369,11 +1390,11 @@ html ="""
                                     </div>
                                 </form>
                             </div>
-                            <div class="col-sm-7">
+                            <div class="col-sm-4">
                                 <form class="form-horizontal">
                                     <div class="form-group">
-                                        <label class="col-xs-4 control-label">Block sync size:</label>
-                                        <div class="col-xs-8">
+                                        <label class="col-xs-12 control-label">Block sync size:</label>
+                                        <div class="col-xs-12">
                                             <div class="radio">
                                               <label>
                                                 <input type="radio" name="daemon_block_sync_size" id="block_sync_size_10" value="10" onclick="set_block_sync_size(10)" checked="">
@@ -1408,13 +1429,48 @@ html ="""
                                     </div>
                                 </form>
                             </div>
-                            <div class="col-sm-12 wallet-settings" style="margin-top: 10px; text-align:center;">
-                                <button id="btn_restart_daemon" type="button" class="btn btn-primary" onclick="restart_daemon()"><i class="fa fa-refresh"></i> Restart Daemon</button>
+                            <div class="col-sm-4">
+                                <form class="form-horizontal" id="speed_limit_form">
+                                    <div class="form-group">
+                                        <div class="col-xs-12">
+                                            <label class="col-xs-12 control-label">Up Speed Limit (kB/s):</label>
+                                            <select class="form-control" id="up_speed_limit_select">
+                                                <option value="512">512</option>
+                                                <option value="1024">1024</option>
+                                                <option value="2048" selected>2048</option>
+                                                <option value="3072">3072</option>
+                                                <option value="4096">4096</option>
+                                                <option value="8192">8192</option>
+                                                <option value="16384">16384</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-xs-12" style="margin-top: 30px;">
+                                            <label class="col-xs-12 control-label">Down Speed Limit (kB/s):</label>
+                                            <select class="form-control" id="down_speed_limit_select">
+                                                <option value="512">512</option>
+                                                <option value="1024">1024</option>
+                                                <option value="2048">2048</option>
+                                                <option value="4096">4096</option>
+                                                <option value="8192" selected>8192</option>
+                                                <option value="12288">12288</option>
+                                                <option value="16384">16384</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="col-sm-12 wallet-settings" style="margin-top: 0px; text-align:center;">
+                                <button id="btn_restart_daemon" type="button" class="btn btn-primary" onclick="restart_daemon()"><i class="fa fa-refresh"></i> Apply (Restart Daemon)</button>
                                 <button id="btn_view_log" type="button" class="btn btn-primary" onclick="app_hub.view_daemon_log()"><i class="fa fa-file"></i> View Log...</button>
                             </div>
                         </div>
                     </div>
-                    <hr style="margin-top:10px;margin-bottom:10px;">
+                    <hr style="margin-top:10px;margin-bottom:0px;">
+                    <div class="row">
+                        <div class="col-sm-12 form-group" style="margin-bottom: 0px; margin-top: 20px; text-align: center">
+                            <input id="minimize_to_tray_chk" type="checkbox" value="" checked="checked"> <label class="control-label" for="minimize_to_tray_chk">Close wallet to notification area (system tray)</label>
+                        </div>
+                    </div>
                     <div class="row">
                         <div class="col-sm-12" style="margin-top: 10px;text-align: center">
                             <button id="btn_about" type="button" class="btn btn-primary" onclick="about_app()"><i class="fa fa-user"></i> About...</button>

@@ -49,34 +49,38 @@ class ProcessManager(Thread):
         
     def stop(self):
         if self.is_proc_running():
-            self.send_command('exit')
-            #self.proc.stdin.close()
-            counter = 0
-            while True:
-                if self.is_proc_running():
-                    if counter < 10:
-                        if counter == 2:
-                            try:
-                                self.send_command('exit')
-                            except:
-                                pass
-                        sleep(1)
-                        counter += 1
+            try:
+                self.send_command('exit')
+                #self.proc.stdin.close()
+                counter = 0
+                while True:
+                    if self.is_proc_running():
+                        if counter < 10:
+                            if counter == 2:
+                                try:
+                                    self.send_command('exit')
+                                except:
+                                    pass
+                            sleep(1)
+                            counter += 1
+                        else:
+                            self.proc.kill()
+                            log("[%s] killed" % self.proc_name, LEVEL_INFO, self.proc_name)
+                            break
                     else:
-                        self.proc.kill()
-                        log("[%s] killed" % self.proc_name, LEVEL_INFO, self.proc_name)
                         break
-                else:
-                    break
-        log("[%s] stopped" % self.proc_name, LEVEL_INFO, self.proc_name)
+                log("[%s] stopped" % self.proc_name, LEVEL_INFO, self.proc_name)
+            except IOError:
+                pass
+        
     
     def is_proc_running(self):
         return (self.proc.poll() is None)
     
 
 class SumokoindManager(ProcessManager):
-    def __init__(self, resources_path, log_level=0, block_sync_size=10):
-        proc_args = u'%s/bin/sumokoind --log-level %d --block-sync-size %d' % (resources_path, log_level, block_sync_size)
+    def __init__(self, resources_path, log_level=0, block_sync_size=10, limit_rate_up=2048, limit_rate_down=8192):
+        proc_args = u'%s/bin/sumokoind --log-level %d --block-sync-size %d --limit-rate-up %d --limit-rate-down %d' % (resources_path, log_level, block_sync_size, limit_rate_up, limit_rate_down)
         ProcessManager.__init__(self, proc_args, "sumokoind")
         self.synced = Event()
         self.stopped = Event()
@@ -110,7 +114,7 @@ class WalletCliManager(ProcessManager):
             wallet_args = u'%s/bin/sumo-wallet-cli --log-file=%s --restore-deterministic-wallet --restore-height %d' \
                                                 % (resources_path, wallet_log_path, restore_height)
         ProcessManager.__init__(self, wallet_args, "sumo-wallet-cli")
-        self.ready = Event()
+        self._ready = Event()
         self.last_error = ""
         self.block_height = 0
         self.top_height = 0
@@ -125,11 +129,12 @@ class WalletCliManager(ProcessManager):
                 self.block_height = int(m_height.group(1))
                 self.top_height = int(m_height.group(2))
             
-            if not self.ready.is_set() and is_ready_str in line:
-                self.ready.set()
+            if not self._ready.is_set() and is_ready_str in line:
+                self._ready.set()
                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_INFO, self.proc_name)
                 log("[%s]>>> %s" % (self.proc_name, "Wallet ready!") , LEVEL_INFO, self.proc_name)
-            elif err_str in line:
+            
+            if err_str in line:
                 self.last_error = line.rstrip()
                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
             elif m_height:
@@ -141,7 +146,7 @@ class WalletCliManager(ProcessManager):
             self.proc.stdout.close()
     
     def is_ready(self):
-        return self.ready.is_set()
+        return self._ready.is_set()
             
     
     def is_connected(self):
@@ -165,15 +170,15 @@ class WalletRPCManager(ProcessManager):
         
         self.rpc_request = WalletRPCRequest(app, self.user_agent)
 #         self.rpc_request.start()
-        self._ready = False
+        self._ready = Event()
         self.block_height = 0
         self.is_password_invalid = Event()
         self.last_log_lines = []
     
     def run(self):
-        is_ready_str = "Starting wallet rpc server"
+        rpc_ready_strs = ["Binding on 127.0.0.1", "Starting wallet rpc server", "Run net_service loop", "Refresh done"]
         err_str = "ERROR"
-        invalid_password = "invalid password"
+        invalid_password_str = "invalid password"
         height_regex = re.compile(r"Processed block: \<([a-z0-9]+)\>, height (\d+)")
         height_regex2 = re.compile(r"Skipped block by height: (\d+)")
         height_regex3 = re.compile(r"Skipped block by timestamp, height: (\d+)")
@@ -188,13 +193,14 @@ class WalletRPCManager(ProcessManager):
                 m_height = height_regex3.search(line)
                 if m_height: self.block_height = m_height.group(1)
                 
-            if not self._ready and is_ready_str in line:
-                self._ready = True
-                log(line.rstrip(), LEVEL_INFO, self.proc_name)
-            elif err_str in line:
+            if not self._ready.is_set() and any(s in line for s in rpc_ready_strs):
+                self._ready.set()
+                log("RPC server ready!", LEVEL_INFO, self.proc_name)
+            
+            if err_str in line:
                 self.last_error = line.rstrip()
                 log(line.rstrip(), LEVEL_ERROR, self.proc_name)
-                if not self.is_password_invalid.is_set() and invalid_password in self.last_error:
+                if not self.is_password_invalid.is_set() and invalid_password_str in self.last_error:
                     self.is_password_invalid.set()
             elif m_height:
                 log(line.rstrip(), LEVEL_INFO, self.proc_name)
@@ -210,7 +216,7 @@ class WalletRPCManager(ProcessManager):
             self.proc.stdout.close()
             
     def is_ready(self):
-        return self._ready
+        return self._ready.is_set()
     
     def is_invalid_password(self):
         return self.is_password_invalid.is_set()

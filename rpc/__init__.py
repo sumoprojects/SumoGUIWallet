@@ -160,7 +160,7 @@ class WalletRPCRequest():
             if 'per_subaddress' in res:
                 per_subaddress = res['per_subaddress']
             return (res['balance'], res['unlocked_balance'], per_subaddress)
-        return (0, 0)
+        return (0, 0, [])
     
     def get_transfers(self, filter_by_height=False, min_height=0, max_height=0, tx_in=True, tx_out=True, tx_pending=False, tx_in_pool=False):
         rpc_input = {"method":"get_transfers"}
