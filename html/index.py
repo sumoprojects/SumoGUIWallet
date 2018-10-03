@@ -5,10 +5,11 @@
 Main UI html
 '''
 
-html ="""
+html =u"""
 <!DOCTYPE html>
 <html>
     <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
         <link href="./css/bootstrap.min.css" rel="stylesheet">
         <link href="./css/font-awesome.min.css" rel="stylesheet">
         <style type="text/css">
@@ -1397,14 +1398,14 @@ html ="""
                                         <div class="col-xs-12">
                                             <div class="radio">
                                               <label>
-                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_10" value="10" onclick="set_block_sync_size(10)" checked="">
-                                                10 (default, for slow network)
+                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_10" value="10" onclick="set_block_sync_size(10)">
+                                                10 (for slow network)
                                               </label>
                                             </div>
                                             <div class="radio">
                                               <label>
-                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_20" value="20" onclick="set_block_sync_size(20)">
-                                                20 (for normal network)
+                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_20" value="20" onclick="set_block_sync_size(20)" checked="">
+                                                20 (default, for normal network)
                                               </label>
                                             </div>
                                             <div class="radio">

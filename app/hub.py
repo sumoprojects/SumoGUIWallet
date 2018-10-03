@@ -7,7 +7,7 @@ Hub is a communication medium between Python codes and web UI
 
 from __future__ import print_function
 
-import os, binascii
+import sys, os, binascii
 from time import sleep
 import uuid
 import json
@@ -35,8 +35,12 @@ from manager.ProcessManager import WalletCliManager
 
 wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
+
+wallet_log_dir_path = os.path.join(DATA_DIR, 'logs')
+makeDir(wallet_log_dir_path)
         
 password_regex = re.compile(r"^([a-zA-Z0-9!@#\$%\^&\*]{1,256})$")
+wallet_file_regex = re.compile(r"wallet_(\d+)")       
 
 from webui import LogViewer
 
@@ -64,10 +68,9 @@ class Hub(QObject):
         else:
             return
         
-        new_wallet_file = os.path.join(wallet_dir_path, str(uuid.uuid4().hex) + '.bin')
+        new_wallet_file = os.path.join(wallet_dir_path, self.get_new_wallet_file_name())
         if wallet_filename:
             wallet_key_filename = wallet_filename + '.keys'
-            wallet_address_filename = wallet_filename + '.address.txt'
             
             if not os.path.exists(wallet_key_filename):
                 QMessageBox.warning(self.new_wallet_ui, \
@@ -80,8 +83,6 @@ class Hub(QObject):
                 copy2(wallet_filename, os.path.join(wallet_dir_path, new_wallet_file))
                 copy2(wallet_key_filename, os.path.join(wallet_dir_path, \
                                                            new_wallet_file + '.keys'))
-                copy2(wallet_address_filename, os.path.join(wallet_dir_path, \
-                                                        new_wallet_file + '.address.txt'))
             except IOError, err:
                 self._detail_error_msg("Importing Wallet", "Error importing wallet!", str(err))
                 self.ui.reset_wallet()
@@ -107,10 +108,8 @@ class Hub(QObject):
         self.on_new_wallet_show_progress_event.emit('Importing wallet...')
         self.app_process_events()
         
-        wallet_address_filepath = new_wallet_file + ".address.txt"
-        wallet_address = readFile(wallet_address_filepath)
         self.ui.wallet_info.wallet_filepath = new_wallet_file
-        self.ui.wallet_info.wallet_address = wallet_address
+        self.ui.wallet_info.wallet_address = "Sumo???"
         self.ui.wallet_info.is_loaded =True
         self.ui.wallet_info.save()
         self.ui.run_wallet_rpc(wallet_password, 1)
@@ -205,54 +204,45 @@ class Hub(QObject):
                 
             if has_password:
                 if not mnemonic_seed: # i.e. create new wallet
-                    mnemonic_seed_language = "0" # english
+                    mnemonic_seed_language = "1" # english
                     seed_language_list = [sl[1] for sl in seed_languages]
+                    list_select_index = 0 if sys.platform in ['win32','cygwin','win64'] else 1
                     lang, ok = QInputDialog.getItem(self.new_wallet_ui, "Mnemonic Seed Language", 
                                 "Select a language for wallet mnemonic seed:", 
-                                seed_language_list, 0, False)
+                                seed_language_list, list_select_index, False)
                     if ok and lang:
                         for sl in seed_languages:
                             if sl[1] == lang:
                                 mnemonic_seed_language = sl[0]
                                 break
                     else:
-                        QMessageBox.warning(self.new_wallet_ui, \
-                                    'Mnemonic Seed Language',\
-                                     "No language is selected!\
-                                     <br>'English' will be used for mnemonic seed")
+                        return
                 
                 self.on_new_wallet_show_progress_event.emit("Restoring wallet..." \
                                         if mnemonic_seed else "Creating wallet...")
                 self.app_process_events()
-                wallet_filepath = os.path.join(wallet_dir_path, str(uuid.uuid4().hex) + '.bin')
-                wallet_log_path = os.path.join(wallet_dir_path, 'sumo-wallet-cli.log')
+                wallet_filepath = os.path.join(wallet_dir_path, self.get_new_wallet_file_name())
+                wallet_log_path = os.path.join(wallet_log_dir_path, 'sumo-wallet-cli-bin.log')
                 resources_path = self.app.property("ResPath")
                 if not mnemonic_seed: # i.e. create new wallet
                     self.wallet_cli_manager = WalletCliManager(resources_path, \
                                                 wallet_filepath, wallet_log_path)
                     self.wallet_cli_manager.start()
-                    self.app_process_events(1)
+                    self.app_process_events(0.1)
                     self.wallet_cli_manager.send_command(wallet_password)
-                    self.app_process_events(0.5)
+                    self.app_process_events(0.1)
                     self.wallet_cli_manager.send_command(mnemonic_seed_language)
-#                     self.app_process_events(0.5)
-#                     self.wallet_cli_manager.send_command("exit")
                 else: # restore wallet
                     self.wallet_cli_manager = WalletCliManager(resources_path, \
                                                 wallet_filepath, wallet_log_path, True, restore_height)
                     self.wallet_cli_manager.start()
-                    self.app_process_events(1)
-                    self.wallet_cli_manager.send_command(wallet_filepath)
-                    self.app_process_events(0.5)
-                    self.wallet_cli_manager.send_command("Y")
-                    self.app_process_events(0.5)
+                    self.app_process_events(0.1)
                     self.wallet_cli_manager.send_command(mnemonic_seed)
-                    if restore_height == 0:
-                        self.app_process_events(0.5)
-                        self.wallet_cli_manager.send_command("0")
-                    self.app_process_events(0.5)
+                    self.app_process_events(0.1)
+                    self.wallet_cli_manager.send_command("")
+                    self.app_process_events(0.1)
                     self.wallet_cli_manager.send_command(wallet_password)
-                    self.app_process_events(0.5)
+                    self.app_process_events(0.1)
                     self.wallet_cli_manager.send_command(wallet_password)
                 counter = 0
                 while not self.wallet_cli_manager.is_ready():
@@ -260,6 +250,8 @@ class Hub(QObject):
                     counter += 1
                     if counter > 10:
                         break
+                self.app_process_events(1)
+                self.wallet_cli_manager.send_command("save")
                 self.wallet_cli_manager.stop()
         except Exception, err:
             log(str(err), LEVEL_ERROR)
@@ -279,7 +271,7 @@ class Hub(QObject):
                 break
             
         if self._is_wallet_files_existed(wallet_filepath):
-            wallet_address = readFile(wallet_filepath + ".address.txt")
+            wallet_address = ""
             self.ui.wallet_info.wallet_filepath = wallet_filepath
             self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
             self.ui.wallet_info.wallet_address = wallet_address
@@ -287,7 +279,7 @@ class Hub(QObject):
             
             self.ui.wallet_info.save()
             
-            self.ui.run_wallet_rpc(wallet_password, 1)
+            self.ui.run_wallet_rpc(wallet_password, 2)
             counter = 0
             block_height = 0
             
@@ -314,6 +306,7 @@ class Hub(QObject):
                     self.ui.reset_wallet(delete_files=False)
                     return
          
+            self.ui.wallet_rpc_manager.rpc_request.save_wallet_to_file()
             self._show_wallet_info()
             self.ui.wallet_info.save()
         else:
@@ -324,7 +317,16 @@ class Hub(QObject):
             
     def _is_wallet_files_existed(self, wallet_filepath):
         return os.path.exists(wallet_filepath) and os.path.exists(wallet_filepath + ".keys")
-            
+    
+    def get_new_wallet_file_name(self):
+        wallet_files = os.listdir(wallet_dir_path)
+        wallet_file_numbers = [0]
+        for wf in wallet_files:
+            m_file_num = wallet_file_regex.search(wf)
+            if m_file_num: 
+                wallet_file_numbers.append(int(m_file_num.group(1)))
+        return "wallet_%d.bin" % (max(wallet_file_numbers) + 1)
+                
     @Slot()
     def rescan_spent(self):
         self.app_process_events()
@@ -736,7 +738,11 @@ class Hub(QObject):
     def _show_wallet_info(self):
         wallet_rpc_request = self.ui.wallet_rpc_manager.rpc_request
         wallet_info = {}
-        wallet_info['address'] = self.ui.wallet_info.wallet_address
+        address_obj = wallet_rpc_request.get_address()
+        if 'address' in address_obj:
+            wallet_info['address'] = address_obj['address']
+        else:
+            wallet_info['address'] = "Sumo???"
         wallet_info['seed'] = wallet_rpc_request.query_key(key_type="mnemonic")
         wallet_info['view_key'] = wallet_rpc_request.query_key(key_type="view_key")
         balance, unlocked_balance, _ = wallet_rpc_request.get_balance()

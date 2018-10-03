@@ -18,6 +18,8 @@ from threading import Thread
 from multiprocessing import Event
 from time import sleep
 
+from requests.auth import HTTPDigestAuth
+
 rpc_id = 0
 
 wallet_rpc_errors = {
@@ -39,14 +41,15 @@ wallet_rpc_errors = {
 class RPCRequest(Thread):
     headers = {'content-type': 'application/json'}
     
-    def __init__(self, rpc_input, url, app, user_agent=None):
+    def __init__(self, rpc_input, url, app, rpc_user_name = None, rpc_password=None):
         Thread.__init__(self)
         self.url = url
         self.rpc_input = rpc_input
         self.app = app
+        self.auth = None
             
-        if user_agent is not None:
-            self.headers.update({"User-Agent": user_agent})
+        if rpc_user_name is not None and rpc_password is not None:
+            self.auth=HTTPDigestAuth(rpc_user_name, rpc_password)
         
         self.response_queue = Queue(1)
         self.daemon = True
@@ -67,10 +70,18 @@ class RPCRequest(Thread):
         self.rpc_input.update({"jsonrpc": "2.0", "id": "%d" % rpc_id})
         
         try:
-            response = requests.post(
-                self.url,
-                data=json.dumps(self.rpc_input),
-                headers=self.headers)
+            if self.auth is not None:
+                response = requests.post(
+                    self.url,
+                    data=json.dumps(self.rpc_input),
+                    headers=self.headers,
+                    auth=self.auth)
+            else:
+                response = requests.post(
+                    self.url,
+                    data=json.dumps(self.rpc_input),
+                    headers=self.headers)
+            
             res_json = response.json()
 #             print(json.dumps(res_json, indent=4))
         except ConnectionError:
@@ -118,14 +129,15 @@ class DaemonRPCRequest():
     
     
 class WalletRPCRequest():
-    def __init__(self, app, user_agent):
-        self.port = 19736
+    def __init__(self, app, rpc_user_name, rpc_password):
+        self.port = 19738
         self.url = "http://localhost:%d/json_rpc" % self.port
         self.app = app
-        self.user_agent = user_agent
+        self.rpc_user_name = rpc_user_name
+        self.rpc_password = rpc_password
         
     def send_request(self, rpc_input):
-        req = RPCRequest(rpc_input, self.url, self.app, self.user_agent)
+        req = RPCRequest(rpc_input, self.url, self.app, self.rpc_user_name, self.rpc_password)
         req.start()
         return req.get_result()
         
@@ -244,5 +256,9 @@ class WalletRPCRequest():
         
     def stop_wallet(self):
         rpc_input = {"method":"stop_wallet"}
+        return self.send_request(rpc_input)
+    
+    def save_wallet_to_file(self):
+        rpc_input = {"method":"store"}
         return self.send_request(rpc_input)
         

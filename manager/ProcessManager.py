@@ -11,6 +11,7 @@ from __future__ import print_function
 import sys, os
 import re
 from subprocess import Popen, PIPE, STDOUT
+import signal
 from threading import Thread
 from multiprocessing import Process, Event
 from time import sleep
@@ -55,8 +56,8 @@ class ProcessManager(Thread):
                 counter = 0
                 while True:
                     if self.is_proc_running():
-                        if counter < 10:
-                            if counter == 2:
+                        if counter < 30:
+                            if counter == 10:
                                 try:
                                     self.send_command('exit')
                                 except:
@@ -79,19 +80,15 @@ class ProcessManager(Thread):
     
 
 class SumokoindManager(ProcessManager):
-    def __init__(self, resources_path, log_level=0, block_sync_size=10, limit_rate_up=2048, limit_rate_down=8192):
+    def __init__(self, resources_path, log_level=0, block_sync_size=20, limit_rate_up=2048, limit_rate_down=8192):
         proc_args = u'%s/bin/sumokoind --log-level %d --block-sync-size %d --limit-rate-up %d --limit-rate-down %d' % (resources_path, log_level, block_sync_size, limit_rate_up, limit_rate_down)
         ProcessManager.__init__(self, proc_args, "sumokoind")
         self.synced = Event()
         self.stopped = Event()
         
     def run(self):
-#         synced_str = "You are now synchronized with the network"
         err_str = "ERROR"
         for line in iter(self.proc.stdout.readline, b''):
-#             if not self.synced.is_set() and line.startswith(synced_str):
-#                 self.synced.set()
-#                 log(synced_str, LEVEL_INFO, self.proc_name)
             if err_str in line:
                 self.last_error = line.rstrip()
                 log("[%s]>>> %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
@@ -106,13 +103,13 @@ class SumokoindManager(ProcessManager):
 class WalletCliManager(ProcessManager):
     fail_to_connect_str = "wallet failed to connect to daemon"
     
-    def __init__(self, resources_path, wallet_file_path, wallet_log_path, restore_wallet=False, restore_height=0):
+    def __init__(self, resources_path, wallet_file_path, wallet_log_dir_path, restore_wallet=False, restore_height=0):
         if not restore_wallet:
             wallet_args = u'%s/bin/sumo-wallet-cli --generate-new-wallet=%s --log-file=%s' \
-                                                % (resources_path, wallet_file_path, wallet_log_path)
+                                                % (resources_path, wallet_file_path, wallet_log_dir_path)
         else:
-            wallet_args = u'%s/bin/sumo-wallet-cli --log-file=%s --restore-deterministic-wallet --restore-height %d' \
-                                                % (resources_path, wallet_log_path, restore_height)
+            wallet_args = u'%s/bin/sumo-wallet-cli --restore-deterministic-wallet --restore-height %d --generate-new-wallet=%s --log-file=%s --daemon-port 99999' \
+                                                % (resources_path, restore_height, wallet_file_path, wallet_log_dir_path)
         ProcessManager.__init__(self, wallet_args, "sumo-wallet-cli")
         self._ready = Event()
         self.last_error = ""
@@ -159,16 +156,17 @@ class WalletCliManager(ProcessManager):
 
 class WalletRPCManager(ProcessManager):
     def __init__(self, resources_path, wallet_file_path, wallet_password, app, log_level=1):
-        self.user_agent = str(uuid4().hex)
-        wallet_log_path = os.path.join(os.path.dirname(wallet_file_path), "sumo-wallet-rpc.log")
-        wallet_rpc_args = u'%s/bin/sumo-wallet-rpc --wallet-file %s --log-file %s --rpc-bind-port 19736 --user-agent %s --log-level %d' \
-                                            % (resources_path, wallet_file_path, wallet_log_path, self.user_agent, log_level)
+        self.rpc_user_name = str(uuid4().hex)[:12]
+        self.rpc_password = str(uuid4().hex)[:12]
+        wallet_log_dir_path = os.path.join(os.path.dirname(wallet_file_path), ".." , "logs", "sumo-wallet-rpc-bin.log")
+        wallet_rpc_args = u'%s/bin/sumo-wallet-rpc --wallet-file %s --log-file %s --rpc-bind-port 19738 --rpc-login %s:%s --prompt-for-password --log-level %d' \
+                                            % (resources_path, wallet_file_path, wallet_log_dir_path, self.rpc_user_name, self.rpc_password, log_level)
                                                                                 
         ProcessManager.__init__(self, wallet_rpc_args, "sumo-wallet-rpc")
         sleep(0.2)
         self.send_command(wallet_password)
         
-        self.rpc_request = WalletRPCRequest(app, self.user_agent)
+        self.rpc_request = WalletRPCRequest(app, self.rpc_user_name, self.rpc_password)
 #         self.rpc_request.start()
         self._ready = Event()
         self.block_height = 0
@@ -236,6 +234,6 @@ class WalletRPCManager(ProcessManager):
                         break
                 else:
                     break
-        self._ready = False
+        self._ready = Event()
         log("[%s] stopped" % self.proc_name, LEVEL_INFO, self.proc_name)        
         

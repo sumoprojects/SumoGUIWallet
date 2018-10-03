@@ -37,7 +37,7 @@ from manager.ProcessManager import SumokoindManager, WalletRPCManager
 from rpc import RPCRequest, DaemonRPCRequest
 
 from classes import AppSettings, WalletInfo
-from html import index, newwallet
+from html import index, newwallet, index_cn
 
 import psutil
 
@@ -109,7 +109,7 @@ class BaseWebUI(QMainWindow):
         self.view.setCursor(qt_core.Qt.ArrowCursor)
         self.view.setZoomFactor(1)
         
-        self.setWindowTitle(APP_NAME)
+        self.setWindowTitle(USER_AGENT)
         self.icon = self._getQIcon('sumokoin_icon_64.png')
         self.setWindowIcon(self.icon)
         
@@ -180,7 +180,7 @@ class MainWebUI(BaseWebUI):
     def __init__(self, app, hub, debug):
         window_size = qt_core.QSize(800, 600)
         BaseWebUI.__init__(self, index.html, app, hub, window_size, debug)
-        self.agent = '%s v.%s' % (USER_AGENT, '.'.join(str(v) for v in VERSION))
+        self.agent = USER_AGENT
         log("Starting [%s]..." % self.agent, LEVEL_INFO)
         
         # Setup the system tray icon

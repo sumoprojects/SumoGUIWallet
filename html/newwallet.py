@@ -290,13 +290,13 @@ html ="""
                             <input id="wallet_address" type="text" class="form-control address-box" style="color:#c7254e;" readonly="readonly" value="Sumoo..."/>
                         </div>
                         <div class="form-group">
-                            <label for="wallet_seed_words">Mnemonic seed <code style="font-weight: bold; color: red">(Important! Always backup the seed words for wallet recovery!)</code></label>
-                            <button id="copy_seed_btn" type="button" class="btn btn-warning btn-sm" style="text-transform: none" onclick="copy_seed()"><i class="fa fa-copy"></i> Copy Seed Words</button>
-                            <textarea id="wallet_seed_words" class="form-control address-box" style="height:70px;font-size:95%;color:#333" readonly="readonly"></textarea>
-                        </div>
-                        <div class="form-group">
                             <label for="wallet_viewkey">View key (private)</label>
                             <input id="wallet_viewkey" class="form-control address-box" type="text" readonly="readonly" />
+                        </div>
+                        <div class="form-group">
+                            <label for="wallet_seed_words">Mnemonic seed <code style="font-weight: bold; color: red">(NOTICE: Always backup the seed words for wallet recovery!)</code></label>
+                            <button id="copy_seed_btn" type="button" class="btn btn-warning btn-sm" style="text-transform: none" onclick="copy_seed()"><i class="fa fa-copy"></i> Copy Seed Words</button>
+                            <textarea id="wallet_seed_words" class="form-control address-box" style="height:70px;font-size:95%;color:#333" readonly="readonly"></textarea>
                         </div>
                         <div class="form-group">
                             <h5><i>Balance:</i> <span id="balance">0.000000000</span></h5>
