@@ -37,7 +37,7 @@ from manager.ProcessManager import SumokoindManager, WalletRPCManager
 from rpc import RPCRequest, DaemonRPCRequest
 
 from classes import AppSettings, WalletInfo
-from html import index, newwallet, index_cn
+from html import index, newwallet
 
 import psutil
 
