@@ -620,13 +620,19 @@ html =u"""
                 
                 app_hub.on_update_wallet_loading_height_event.connect(function(height, target_height){
                     //console.log(height);
-                    if(height < target_height){
-                        if($('#app_modal_progress').is(':visible')){
-                            msg = "Processing block# " + height;
-                            if( target_height > 0 ) msg += "/" + target_height;
-                            $('#app_modal_progress_subtext').html(msg);
-                            $('#app_modal_progress_subtext').show();
+                    if(!$('#app_modal_progress').is(':visible')){
+                        return;
+                    }
+                    
+                    if(height < target_height - 1){
+                        msg = "Processing block# " + height;
+                        if( target_height > 0 ){
+                            sync_pct = target_height > 0 ? (height*100.0/target_height).toFixed(1) : 0;
+                            msg += "/" + target_height + " (" + sync_pct + "%)";
+                            $('#app_modal_progress_text').html("Loading wallet... (" + sync_pct + "%)");
                         }
+                        $('#app_modal_progress_subtext').html(msg);
+                        $('#app_modal_progress_subtext').show();
                     }
                     else{
                         $('#app_modal_progress_subtext').hide();

@@ -9,7 +9,6 @@ from __future__ import print_function
 
 import sys, os, binascii
 from time import sleep
-import uuid
 import json
 import re
 import hashlib
@@ -26,12 +25,7 @@ from utils.common import print_money, print_money2, readFile
 from settings import APP_NAME, VERSION, DATA_DIR, COIN, makeDir, seed_languages
 from utils.logger import log, LEVEL_ERROR, LEVEL_INFO
 
-# from utils.notify import Notify
-# from sys import stderr
-
 tray_icon_tooltip = "%s v%d.%d" % (APP_NAME, VERSION[0], VERSION[1])
-
-from manager.ProcessManager import WalletCliManager
 
 wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
@@ -107,48 +101,27 @@ class Hub(QObject):
         
         self.on_new_wallet_show_progress_event.emit('Importing wallet...')
         self.app_process_events()
+
+        ret = self.ui.wallet_rpc_manager.rpc_request.open_wallet(
+                                            os.path.basename(new_wallet_file), 
+                                            wallet_password)
         
+        if ret['status'] == "ERROR":
+            error_message = ret['message']
+            QMessageBox.critical(self.new_wallet_ui, \
+                    'Error Importing Wallet',\
+                    "Error: %s" % error_message)
+            self.ui.reset_wallet()
+            return False
+        
+        self.current_block_height = 0 # reset current wallet block height
+        
+        self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
         self.ui.wallet_info.wallet_filepath = new_wallet_file
-        self.ui.wallet_info.wallet_address = "Sumo???"
         self.ui.wallet_info.is_loaded =True
         self.ui.wallet_info.save()
-        self.ui.run_wallet_rpc(wallet_password, 1)
         
-        counter = 0
-        block_height = 0
-        while not self.ui.wallet_rpc_manager.is_ready():
-            self.app_process_events(0.5)
-            h = int(self.ui.wallet_rpc_manager.block_height)
-            if h >  block_height:
-                self.on_new_wallet_update_processed_block_height_event.emit(h, self.ui.target_height)
-                counter = 0
-                block_height = h
-            if self.ui.wallet_rpc_manager.is_invalid_password():
-                QMessageBox.critical(self.new_wallet_ui, \
-                        'Error Importing Wallet',\
-                        "Error: Provided wallet password is not valid!")
-                self.ui.reset_wallet()
-                return False
-            if not self.ui.wallet_rpc_manager.is_proc_running():
-                error_detailed_text = self.ui.wallet_rpc_manager.last_error \
-                    if self.ui.wallet_rpc_manager.last_error else "Unknown error"
-                self._detail_error_msg("Error Importing Wallet", \
-                                       "Error importing wallet!", \
-                                       error_detailed_text)
-                self.ui.reset_wallet()
-                return False
-            counter += 1
-            if counter > 30:
-                QMessageBox.critical(self.new_wallet_ui, \
-                        'Error Importing Wallet',\
-                        """Error: Unknown error.<br>
-                        Imported wallet file may be corrupted. 
-                        Try to restore it with mnemonic seed instead.""")
-                self.ui.reset_wallet()
-                return False
-        self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
-        self._show_wallet_info()
-        self.ui.wallet_info.save()
+        self.show_wallet_info()
         return True
         
         
@@ -161,24 +134,15 @@ class Hub(QObject):
             self.ui.show_wallet();
         
 
-    @Slot(unicode, int)
-    def create_new_wallet(self, mnemonic_seed=u'', restore_height=0):
-        if mnemonic_seed and restore_height > 0:
-            ret = QMessageBox.warning(self.new_wallet_ui, \
-                    'Restore Wallet',\
-                     """Are you sure to restore wallet from blockchain height# %d?<br><br>
-                     WARNING: Inccorect height# will lead to incorrect balance and failed transactions!""" % restore_height, \
-                     QMessageBox.Yes|QMessageBox.No, defaultButton = QMessageBox.No)
-            if ret == QMessageBox.No:
-                return
-        
+    @Slot()
+    def create_new_wallet(self):
         wallet_password = None
         wallet_filepath = ""
         try:
             has_password = False
             while True:
                 wallet_password, result = self._custom_input_dialog(self.new_wallet_ui, \
-                        "Wallet Password", "Set wallet password:", QLineEdit.Password)
+                        "Wallet Password", "Set new wallet password:", QLineEdit.Password)
                 if result:
                     if not password_regex.match(wallet_password):
                         QMessageBox.warning(self.new_wallet_ui, \
@@ -199,121 +163,159 @@ class Hub(QObject):
                         else:
                             has_password = True
                             break
+                    else:
+                        break
                 else:
                     break
                 
             if has_password:
-                if not mnemonic_seed: # i.e. create new wallet
-                    mnemonic_seed_language = "1" # english
-                    seed_language_list = [sl[1] for sl in seed_languages]
-                    list_select_index = 0 if sys.platform in ['win32','cygwin','win64'] else 1
-                    lang, ok = QInputDialog.getItem(self.new_wallet_ui, "Mnemonic Seed Language", 
-                                "Select a language for wallet mnemonic seed:", 
-                                seed_language_list, list_select_index, False)
-                    if ok and lang:
-                        for sl in seed_languages:
-                            if sl[1] == lang:
-                                mnemonic_seed_language = sl[0]
-                                break
-                    else:
-                        return
+                mnemonic_seed_language = "English"
+                seed_language_list = [sl[1] for sl in seed_languages]
+                list_select_index = 1
+                lang, ok = QInputDialog.getItem(self.new_wallet_ui, "Mnemonic Seed Language", 
+                            "Select a language for wallet mnemonic seed:", 
+                            seed_language_list, list_select_index, False)
+                if ok and lang:
+                    for sl in seed_languages:
+                        if sl[1] == lang:
+                            mnemonic_seed_language = sl[0]
+                            break
+                else:
+                    return
                 
-                self.on_new_wallet_show_progress_event.emit("Restoring wallet..." \
-                                        if mnemonic_seed else "Creating wallet...")
+                self.on_new_wallet_show_progress_event.emit("Creating wallet...")
                 self.app_process_events()
-                wallet_filepath = os.path.join(wallet_dir_path, self.get_new_wallet_file_name())
-                wallet_log_path = os.path.join(wallet_log_dir_path, 'sumo-wallet-cli-bin.log')
-                resources_path = self.app.property("ResPath")
-                if not mnemonic_seed: # i.e. create new wallet
-                    self.wallet_cli_manager = WalletCliManager(resources_path, \
-                                                wallet_filepath, wallet_log_path)
-                    self.wallet_cli_manager.start()
-                    self.app_process_events(0.1)
-                    self.wallet_cli_manager.send_command(wallet_password)
-                    self.app_process_events(0.1)
-                    self.wallet_cli_manager.send_command(mnemonic_seed_language)
-                else: # restore wallet
-                    self.wallet_cli_manager = WalletCliManager(resources_path, \
-                                                wallet_filepath, wallet_log_path, True, restore_height)
-                    self.wallet_cli_manager.start()
-                    self.app_process_events(0.1)
-                    self.wallet_cli_manager.send_command(mnemonic_seed)
-                    self.app_process_events(0.1)
-                    self.wallet_cli_manager.send_command("")
-                    self.app_process_events(0.1)
-                    self.wallet_cli_manager.send_command(wallet_password)
-                    self.app_process_events(0.1)
-                    self.wallet_cli_manager.send_command(wallet_password)
-                counter = 0
-                while not self.wallet_cli_manager.is_ready():
-                    self.app_process_events(1)
-                    counter += 1
-                    if counter > 10:
-                        break
-                self.app_process_events(1)
-                self.wallet_cli_manager.send_command("save")
-                self.wallet_cli_manager.stop()
+                wallet_filename = self.get_new_wallet_file_name()
+                wallet_filepath = os.path.join(wallet_dir_path, wallet_filename)
+
+                self.app_process_events(5)               
+                ret = self.ui.wallet_rpc_manager.rpc_request.create_wallet(wallet_filename, 
+                                                                     wallet_password, 
+                                                                     mnemonic_seed_language)
+                if ret['status'] == "ERROR":
+                    error_message = ret['message']
+                    QMessageBox.critical(self.new_wallet_ui, \
+                            'Error Creating Wallet',\
+                            "Error: %s" % error_message)
+                    self.ui.wallet_rpc_manager.stop()
+                    self.ui.reset_wallet(delete_files=False)
+                    raise Exception("Error creating wallet: %s" % error_message)
+                
+                self.current_block_height = 0 # reset current wallet block height
+                
+                self.ui.wallet_info.wallet_filepath = wallet_filepath
+                self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
+                self.ui.wallet_info.is_loaded = True
+                self.ui.wallet_info.save()
+                
+                self.show_wallet_info()
         except Exception, err:
             log(str(err), LEVEL_ERROR)
-            last_wallet_error = self.wallet_cli_manager.last_error
-            error_detailed_text = last_wallet_error if last_wallet_error else str(err)
-            self._detail_error_msg("Error Create/Restore Wallet", \
-                                       "Error creating/restoring wallet!", \
-                                       error_detailed_text)
             self.on_new_wallet_ui_reset_event.emit()
+            return          
+            
+            
+    @Slot(unicode, int, unicode)
+    def restore_deterministic_wallet(self, mnemonic_seed, restore_height=0, seed_offset_passphrase=u''):
+        from settings.electrum_words import find_seed_language
+        language_name, english_seed = find_seed_language(mnemonic_seed)
+        if language_name is None:
+            QMessageBox.critical(self.new_wallet_ui, \
+                    'Error Restoring Wallet',\
+                    """ERROR: Invalid mnemonic seed!<br>
+                    Seed words missing, incorrect or not match any language<br><br>
+                    NOTE: Sumokoin mnemonic seed must be a list of 26 (valid) words""")
             return
         
-        counter = 0
-        while not self._is_wallet_files_existed(wallet_filepath):
-            self.app_process_events(1)
-            counter += 1
-            if counter > 10:
-                break
+        if restore_height > 0:
+            ret = QMessageBox.warning(self.new_wallet_ui, \
+                    'Restore Wallet',\
+                     """Are you sure to restore wallet from blockchain height# %d?<br><br>
+                     WARNING: Incorrect height# will lead to incorrect balance and failed transactions!""" % restore_height, \
+                     QMessageBox.Yes|QMessageBox.No, defaultButton = QMessageBox.No)
+            if ret == QMessageBox.No:
+                return
+        
+        wallet_password = None
+        try:
+            has_password = False
+            while True:
+                wallet_password, result = self._custom_input_dialog(self.new_wallet_ui, \
+                        "Wallet Password", "Set new wallet password:", QLineEdit.Password)
+                if result:
+                    if not password_regex.match(wallet_password):
+                        QMessageBox.warning(self.new_wallet_ui, \
+                            'Wallet Password',\
+                             "Password must contain at least 1 character [a-zA-Z] or number [0-9]\
+                                        <br>or special character like !@#$%^&* and not contain spaces")
+                        continue
+                    
+                    confirm_password, result = self._custom_input_dialog(self.new_wallet_ui, \
+                        'Wallet Password', \
+                        "Confirm wallet password:", QLineEdit.Password)
+                    if result:
+                        if confirm_password != wallet_password:
+                            QMessageBox.warning(self.new_wallet_ui, \
+                                'Wallet Password',\
+                                 "Confirm password does not match password!\
+                                                 <br>Please re-enter password")
+                        else:
+                            has_password = True
+                            break
+                    else:
+                        break
+                else:
+                    break
             
-        if self._is_wallet_files_existed(wallet_filepath):
-            wallet_address = ""
-            self.ui.wallet_info.wallet_filepath = wallet_filepath
-            self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
-            self.ui.wallet_info.wallet_address = wallet_address
-            self.ui.wallet_info.is_loaded = True
-            
-            self.ui.wallet_info.save()
-            
-            self.ui.run_wallet_rpc(wallet_password, 2)
-            counter = 0
-            block_height = 0
-            
-            while not self.ui.wallet_rpc_manager.is_ready():
-                self.app_process_events(1)
-                h = int(self.ui.wallet_rpc_manager.block_height)
-                if h >  block_height:
-                    self.on_new_wallet_update_processed_block_height_event.emit(h, self.ui.target_height)
-                    counter = 0
-                    block_height = h
-                if not self.ui.wallet_rpc_manager.is_proc_running():
-                    error_detailed_text = self.ui.wallet_rpc_manager.last_error \
-                            if self.ui.wallet_rpc_manager.last_error else "Unknown error"
-                    self._detail_error_msg("Error Create/Restore Wallet", \
-                                       "Error: Unknown error! Wallet RPC appears not to be responding.", \
-                                       error_detailed_text)
-                    self.ui.reset_wallet(delete_files=False)
-                    return
-                counter += 1
-                if counter > 120:
+            if has_password:
+                self.on_new_wallet_show_progress_event.emit("Restoring wallet...")
+                self.app_process_events()
+                wallet_filename = self.get_new_wallet_file_name()
+                wallet_filepath = os.path.join(wallet_dir_path, wallet_filename)
+                
+                ret = self.ui.wallet_rpc_manager.rpc_request.restore_deterministic_wallet(english_seed, 
+                            restore_height, wallet_filename, seed_offset_passphrase, wallet_password, "English")
+                if ret['status'] == "ERROR":
+                    error_message = ret['message']
                     QMessageBox.critical(self.new_wallet_ui, \
-                            'Error Creating/Restoring Wallet',\
-                            """Error: Unknown error! Wallet RPC appears not to be responding.""")
-                    self.ui.reset_wallet(delete_files=False)
-                    return
-         
-            self.ui.wallet_rpc_manager.rpc_request.save_wallet_to_file()
-            self._show_wallet_info()
-            self.ui.wallet_info.save()
-        else:
-            QMessageBox.critical(self.new_wallet_ui, \
-                            'Error Creating/Restoring Wallet',\
-                            """Error: Wallet files not found!""")    
-            self.on_new_wallet_ui_reset_event.emit()
+                            'Error Restoring Wallet',\
+                            "Error: %s" % error_message)
+                    raise Exception("Error restoring wallet: %s" % error_message)
+                
+                ret = self.ui.wallet_rpc_manager.rpc_request.set_wallet_seed_language(language_name)
+                if ret['status'] == "ERROR":
+                    error_message = ret['message']
+                    QMessageBox.critical(self.new_wallet_ui, \
+                            'Error Restoring Wallet',\
+                            "Error: %s" % error_message)
+                    raise Exception("Error restoring wallet: %s" % error_message)
+                
+                self.current_block_height = 0 # reset current wallet block height
+                
+                self.ui.wallet_info.wallet_filepath = wallet_filepath
+                self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
+                self.ui.wallet_info.is_loaded = True
+                self.ui.wallet_info.save()
+                
+                counter = 0
+                self.ui.wallet_rpc_manager.set_ready(False)
+                while not self.ui.wallet_rpc_manager.is_ready():
+                    self.app_process_events(1)
+                    h = self.ui.wallet_rpc_manager.get_block_height()
+                    if h >  self.current_block_height:
+                        self.on_new_wallet_update_processed_block_height_event.emit(h, self.ui.target_height)
+                        self.current_block_height = h
+                        counter = 0
+                    counter += 1
+                    if counter > 120:
+                        break
+                    
+                self.show_wallet_info()
+        except Exception, err:
+            log(str(err), LEVEL_ERROR)
+            self.ui.reset_wallet(delete_files=False)
+            return
+                
             
     def _is_wallet_files_existed(self, wallet_filepath):
         return os.path.exists(wallet_filepath) and os.path.exists(wallet_filepath + ".keys")
@@ -590,6 +592,16 @@ class Hub(QObject):
             QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
             return
         
+        
+        ret = self.ui.wallet_rpc_manager.rpc_request.close_wallet()
+        if ret['status'] == "ERROR":
+            error_message = ret['message']
+            QMessageBox.critical(self.new_wallet_ui, \
+                    'Error Closing Current Wallet',\
+                    "Error: %s" % error_message)
+            return
+        
+        self.current_block_height = 0
         self.ui.show_new_wallet_ui()
         
     
@@ -676,7 +688,7 @@ class Hub(QObject):
         if self.ui.wallet_rpc_manager is None:
             return
         
-        h = int(self.ui.wallet_rpc_manager.block_height)
+        h = self.ui.wallet_rpc_manager.get_block_height()
         if h > self.current_block_height:
             self.on_update_wallet_loading_height_event.emit(h, self.ui.target_height)
             self.current_block_height = h
@@ -735,7 +747,7 @@ class Hub(QObject):
         return (text, result)
     
     
-    def _show_wallet_info(self):
+    def show_wallet_info(self):
         wallet_rpc_request = self.ui.wallet_rpc_manager.rpc_request
         wallet_info = {}
         address_obj = wallet_rpc_request.get_address()

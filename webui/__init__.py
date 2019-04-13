@@ -24,7 +24,7 @@ import PySide.QtWebKit as web_core
 from PySide.QtCore import QTimer
 
 
-from settings import APP_NAME, USER_AGENT, VERSION, COIN
+from settings import APP_NAME, USER_AGENT, VERSION, COIN,DATA_DIR, makeDir
 from utils.logger import log, LEVEL_DEBUG, LEVEL_ERROR, LEVEL_INFO
 from utils.common import readFile
 
@@ -40,6 +40,11 @@ from classes import AppSettings, WalletInfo
 from html import index, newwallet
 
 import psutil
+
+wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
+makeDir(wallet_dir_path)
+
+INVALID_PASSWORD_STR = "Invalid password"
 
 TIMER2_INTERVAL = 60000
 MAX_NEW_SUBADDRESSES = 10
@@ -172,7 +177,7 @@ class NewWalletWebUI(BaseWebUI):
     def __init__(self, app, hub, debug):
         window_size = qt_core.QSize(810, 560)
         BaseWebUI.__init__(self, newwallet.html, app, hub, window_size, debug)
-        self.setWindowFlags(qt_core.Qt.FramelessWindowHint)
+#         self.setWindowFlags(qt_core.Qt.FramelessWindowHint)
         self.show()
 
         
@@ -201,7 +206,6 @@ class MainWebUI(BaseWebUI):
         self.app.aboutToQuit.connect(self._handleAboutToQuit)
         
         self.sumokoind_daemon_manager = None
-        self.wallet_cli_manager = None
         self.wallet_rpc_manager = None
         
         self.new_wallet_ui = None
@@ -215,6 +219,8 @@ class MainWebUI(BaseWebUI):
         ## Blockchain height
         self.target_height = self.app_settings.settings['blockchain']['height']
         self.current_height = 0
+        
+        self.daemon_version = None
         
         # Setup the tray icon context menu
         self.trayMenu = QMenu()
@@ -301,18 +307,18 @@ class MainWebUI(BaseWebUI):
         if not hasattr(self, "timer2"):
             self.timer2 = QTimer(self)
             self.timer2.timeout.connect(self.update_wallet_info)
-        
         self.timer2.stop()
         self.timer2.start(TIMER2_INTERVAL)
+        
         self.show()
         self.trayIcon.show()
-        
+    
     
     def hide_wallet(self):
         self.hide()
         self.trayIcon.hide()   
     
-    def run_wallet_rpc(self, wallet_password, log_level=0):
+    def run_wallet_rpc(self, log_level=0):
         # first, try to stop any wallet RPC server running
         try:
             RPCRequest('wallet_rpc').send_request({"method":"stop_wallet"})
@@ -323,9 +329,8 @@ class MainWebUI(BaseWebUI):
             self.hub.app_process_events()
             sumokoind_info = self.daemon_rpc_request.get_info()
             if sumokoind_info['status'] == "OK":
-                self.wallet_rpc_manager = WalletRPCManager(self.app.property("ResPath"), \
-                                                self.wallet_info.wallet_filepath, \
-                                                wallet_password, \
+                self.wallet_rpc_manager = WalletRPCManager(self.app.property("ResPath"),
+                                                wallet_dir_path, 
                                                 self.app, log_level)
                 self.wallet_rpc_manager.start()
                 break
@@ -341,6 +346,8 @@ class MainWebUI(BaseWebUI):
                 target_height = self.current_height
             if self.target_height < target_height:
                 self.target_height = target_height;
+            if not self.daemon_version:
+                self.daemon_version = sumokoind_info['version']
         else:
             status = sumokoind_info['status']
         
@@ -360,7 +367,7 @@ class MainWebUI(BaseWebUI):
     
     
     def update_wallet_info(self):
-        if not self.wallet_rpc_manager.is_ready():
+        if self.wallet_rpc_manager is None:
             return
         
         wallet_info = {}
@@ -470,6 +477,7 @@ class MainWebUI(BaseWebUI):
     
     def show_new_wallet_ui(self):
         self.reset_wallet(delete_files=False)
+        self.wallet_rpc_manager.reset_block_height()
         self.hide_wallet()
         self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
         self.hub.setNewWalletUI(self.new_wallet_ui)
@@ -477,15 +485,11 @@ class MainWebUI(BaseWebUI):
         
         
     def reset_wallet(self, delete_files=True):
-        if self.wallet_rpc_manager is not None:
-            self.wallet_rpc_manager.stop()
-        
         wallet_filepath = self.wallet_info.wallet_filepath
         if delete_files and wallet_filepath and os.path.exists(wallet_filepath):
             try:
                 os.remove(wallet_filepath)
                 os.remove(wallet_filepath + ".keys")
-                os.remove(wallet_filepath + ".address.txt")
             except:
                 pass
         
@@ -518,10 +522,17 @@ class MainWebUI(BaseWebUI):
         self.trayIcon.showMessage(title, message, icon, timeout)
         
     def about(self):
+        daemon_version_str = "<br><br>- Core (daemon/wallet binaries) version: %s" % self.daemon_version
         QMessageBox.about(self, "About", \
-            u"%s <br><br>Copyright© 2017 -2018 - Sumokoin Projects (www.sumokoin.org)" % self.agent)
+            u"%s %s <br><br>Copyright© 2017 -2019 - Sumokoin Projects (www.sumokoin.org)" % \
+                                                            (self.agent, daemon_version_str))
     
     def _load_wallet(self):
+        if not self.wallet_rpc_manager:
+            self.run_wallet_rpc(2)
+            while not self.wallet_rpc_manager.is_ready():
+                self.hub.app_process_events(0.5)
+        
         if self.wallet_info.load():
             wallet_password = None
             self.show()
@@ -548,17 +559,46 @@ class MainWebUI(BaseWebUI):
                 else:
                     self.show_new_wallet_ui()
                 return
-            else:
-                self.run_wallet_rpc(wallet_password, 2)
-                while not self.wallet_rpc_manager.is_ready():
-                    self.hub.app_process_events(0.5)
-                    if self.wallet_rpc_manager.is_invalid_password():
-                        QMessageBox.critical(self, \
+            
+            wallet_load_failed = True
+            retrial_counter = 0
+            while wallet_load_failed:
+                ret = self.wallet_rpc_manager.rpc_request.open_wallet(
+                                        os.path.basename(self.wallet_info.wallet_filepath), 
+                                        wallet_password)
+                if ret['status'] == "ERROR":
+                    error_message = ret['message']
+                    QMessageBox.critical(self.new_wallet_ui, \
                             'Error Starting Wallet',\
-                            "Error: Wallet password is incorrect!<br><br>Please retry...")
-                        self._load_wallet()
-                        return
-                
+                            "Error: %s" % error_message)
+                    if INVALID_PASSWORD_STR in error_message:
+                        if retrial_counter > 1:
+                            break
+                        
+                        wallet_password, result = self.hub._custom_input_dialog(self, \
+                                    "Wallet Password", "Re-enter wallet password:", \
+                                    QLineEdit.Password)
+                        if not result:
+                            wallet_password = None
+                            break
+                        elif not wallet_password:
+                            QMessageBox.warning(self, "Wallet Password", \
+                                                "Password is required to open wallet!")
+                            break
+                        retrial_counter += 1
+                    else:
+                        break
+                else:
+                    wallet_load_failed = False
+                    
+            if wallet_load_failed:
+                reply = QMessageBox.question(self,'Create new wallet?',
+                    "Wallet failed to load! Do you want to create a new wallet instead?", QMessageBox.Yes,QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.show_new_wallet_ui()
+                else:
+                    self.handleExitAction(show_confirmation=False)
+            else:       
                 self.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
                 self.update_wallet_info()
                 if not hasattr(self, "timer2"):
@@ -568,10 +608,7 @@ class MainWebUI(BaseWebUI):
                 self.timer2.stop()
                 self.timer2.start(TIMER2_INTERVAL)
         else:
-            self.hide_wallet()
-            self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
-            self.hub.setNewWalletUI(self.new_wallet_ui)
-            self.new_wallet_ui.run()
+            self.show_new_wallet_ui()
             
     def _handleTrayIconActivate(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:

@@ -24,21 +24,19 @@ html ="""
             }
             
             function create_new_wallet(){
-                app_hub.create_new_wallet('', 0);
+                app_hub.create_new_wallet();
                 return false;
             }
             
             function restore_wallet(){
                 var seed = $('#seed').val();
                 var restore_height = $('#restore_height_txt').val();
+                var offset_seed_passphrase = $('#offset_seed_passphrase_txt').val();
+                var h =  !isNaN(parseInt(restore_height)) ? parseInt(restore_height) : 0;
+                if(h < 0) h = 0;
+                
                 seed = replaceAll(seed, "\\n", " ");
-                if(seed.length == 0 || seed.split(" ").length != 26)
-                    alert("Please paste 26 mnemonic seed words to above box", "Seed words required!");
-                else{
-                    var h =  !isNaN(parseInt(restore_height)) ? parseInt(restore_height) : 0;
-                    if(h < 0) h = 0;
-                    app_hub.create_new_wallet(seed, h);
-                }
+                app_hub.restore_deterministic_wallet(seed, h, offset_seed_passphrase)
                 return false;
             }
             
@@ -215,6 +213,22 @@ html ="""
                 display:none;
             }
             
+            .progress{
+                height: 22px;
+                text-align: center;
+                background: #ddd;
+            }
+            
+            #progress_bar_text_high{
+                font-size: 90%; 
+                display: none;
+            }
+            
+            #progress_bar_text_low{
+                font-size: 80%;
+                color: #c7254e;
+            }
+            
             .form-control.address-box{
                 font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
                 font-size: 85%;
@@ -255,12 +269,13 @@ html ="""
                 </div>
                 <div class="row">
                     <div class="col-sm-12">
-                        <h4>Restore Wallet <small></small></h4>
+                        <h4>Restore Wallet from Mnemonic Seed<small></small></h4>
                         <div class="form-group">
                             <label for="seed" style="font-weight: bold;margin-right: 20px">Mnemonic Seed:</label>    <button id="paste_seed_btn" type="button" class="btn btn-warning btn-sm" style="text-transform: none" onclick="paste_seed()"><i class="fa fa-paste"></i> Paste</button>
                             <textarea id="seed" class="form-control" placeholder="Paste 26 mnemonic seed words here (use [Paste] button above or press Ctrl+V)" style="height:80px;margin-bottom:10px;margin-top:10px;font-size:100%"></textarea>
                             <button id="restore_wallet_btn" type="button" class="btn btn-primary" onclick="restore_wallet()"><i class="fa fa-undo"></i> Restore</button>
-                            <input id="restore_height_txt" type="text" class="form-control" style="display: inline-block; float:right; width: 100px" value="0"/> <label for="restore_height_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Restore from height#</label> 
+                            <input id="restore_height_txt" type="text" class="form-control" style="display: inline-block; float:right; width: 70px" value="0"/> <label for="restore_height_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Restore from height#</label>
+                            <input id="offset_seed_passphrase_txt" type="password" class="form-control" style="display: inline-block; float:right; width: 180px" value=""/> <label for="offset_seed_passphrase_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Offset seed passphrase</label> 
                         </div>
                     </div>
                 </div>

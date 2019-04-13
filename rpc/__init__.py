@@ -39,7 +39,7 @@ wallet_rpc_errors = {
 }
 
 class RPCRequest(Thread):
-    headers = {'content-type': 'application/json'}
+    headers = {'content-type': 'application/json; charset=UTF-8'}
     
     def __init__(self, rpc_input, url, app, rpc_user_name = None, rpc_password=None):
         Thread.__init__(self)
@@ -83,7 +83,6 @@ class RPCRequest(Thread):
                     headers=self.headers)
             
             res_json = response.json()
-#             print(json.dumps(res_json, indent=4))
         except ConnectionError:
             return {"status": "Disconnected" }
         except:
@@ -101,13 +100,14 @@ class RPCRequest(Thread):
                         res_json['error']['message'] = res_json['error']['message'].replace(k, v)
                         break
                 return res_json['error']
+            
+        # print(json.dumps(res_json, indent=4))
         return res_json
     
     
     def get_result(self):
         while self.response_queue.empty():
             self.app.processEvents()
-            sleep(.1)
         return self.response_queue.get()
         
 
@@ -260,5 +260,50 @@ class WalletRPCRequest():
     
     def save_wallet_to_file(self):
         rpc_input = {"method":"store"}
+        return self.send_request(rpc_input)
+    
+    def restore_deterministic_wallet(self, seed, restore_height, filename, 
+                                    seed_offset_passphrase, password, language):
+        rpc_input = {"method":"restore_deterministic_wallet"}
+        params = {"seed": seed,
+                  "restore_height": restore_height,
+                  "filename": filename,
+                  "seed_offset": seed_offset_passphrase,
+                  "password": password,
+                  "language": language,
+                }
+        rpc_input["params"] = params
+        return self.send_request(rpc_input)
+    
+    def create_wallet(self, filename, password, language):
+        rpc_input = {"method":"create_wallet"}
+        params = {"filename": filename,
+                  "password": password,
+                  "language": language,
+                }
+        rpc_input["params"] = params
+        return self.send_request(rpc_input)
+    
+    def set_wallet_seed_language(self, language):
+        rpc_input = {"method":"set_seed_language"}
+        params = {"language": language,
+                }
+        rpc_input["params"] = params
+        return self.send_request(rpc_input)
+    
+    def open_wallet(self, filename, password):
+        rpc_input = {"method":"open_wallet"}
+        params = {"filename": filename,
+                  "password": password
+                }
+        rpc_input["params"] = params
+        return self.send_request(rpc_input)
+    
+    def close_wallet(self):
+        rpc_input = {"method":"close_wallet"}
+        return self.send_request(rpc_input)
+    
+    def get_version(self):
+        rpc_input = {"method":"get_version"}
         return self.send_request(rpc_input)
         
