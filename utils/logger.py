@@ -13,7 +13,7 @@ from common import ensureDir
 
 # Verbosity and log level
 QUIET           = False
-DEBUG           = False
+DEBUG           = True
 DEBUG_PROTOCOL  = False
 INFO            = True
 
