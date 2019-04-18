@@ -151,8 +151,8 @@ class WalletRPCManager(ProcessManager):
                 log("[%s] %s" % (self.proc_name, line.rstrip()), LEVEL_ERROR, self.proc_name)
             elif m_height:
                 log("[%s] %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
-#             else:
-#                 log("[%s] %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
+            else:
+                log("[%s] %s" % (self.proc_name, line.rstrip()), LEVEL_DEBUG, self.proc_name)
             if self._stopped:
                 break
 

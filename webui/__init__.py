@@ -12,6 +12,7 @@ import hashlib
 import os, json
 import signal
 import copy
+import traceback
 from time import sleep
 
 from PySide.QtGui import QApplication, QMainWindow, QIcon, \
@@ -321,13 +322,13 @@ class MainWebUI(BaseWebUI):
         self.trayIcon.hide()
 
     def run_wallet_rpc(self, log_level=0):
-        while True:
-            self.hub.app_process_events()
-            sumokoind_info = self.daemon_rpc_request.get_info()
-            if sumokoind_info['status'] == "OK":
-                self.wallet_rpc_manager = WalletRPCManager(self.app.property("ResPath"),
+        self.wallet_rpc_manager = WalletRPCManager(self.app.property("ResPath"),
                                                 wallet_dir_path,
                                                 self.app, log_level)
+        while True:
+            self.app.processEvents()
+            sumokoind_info = self.daemon_rpc_request.get_info()
+            if sumokoind_info['status'] == "OK":
                 self.wallet_rpc_manager.start()
                 self.wallet_rpc_pid = self.wallet_rpc_manager.get_pid()
                 break
@@ -364,7 +365,7 @@ class MainWebUI(BaseWebUI):
 
 
     def update_wallet_info(self):
-        if self.wallet_rpc_manager is None:
+        if self.wallet_rpc_manager is None or not self.wallet_rpc_manager.is_ready():
             return
 
         wallet_info = {}
@@ -431,39 +432,41 @@ class MainWebUI(BaseWebUI):
                     tx["confirmation"] = self.target_height - tx["height"] if self.target_height > tx["height"] else 0
                     wallet_info["recent_txs"].append(tx)
 
-            adddress_info = self.wallet_rpc_manager.rpc_request.get_address()
-            wallet_info['address'] = adddress_info['address']
+            wallet_info['address'] = ""
             wallet_info['used_subaddresses'] = []
             wallet_info['new_subaddresses'] = []
-            for subaddress in adddress_info['addresses']:
-                if subaddress['used']:
-                    wallet_info['used_subaddresses'].append(subaddress)
-                    # update subaddress balance
-                    subaddress['balance'] = 0.
-                    subaddress['unlocked_balance'] = 0.
-                    for s in per_subaddress:
-                        if s['address_index'] == subaddress['address_index']:
-                            subaddress['balance'] = s['balance']/COIN
-                            subaddress['unlocked_balance'] = s['unlocked_balance']/COIN
-                            break
-                else:
-                    if subaddress['address_index'] > 0:
-                        wallet_info['new_subaddresses'].append(subaddress)
+            adddress_info = self.wallet_rpc_manager.rpc_request.get_address()
+            if adddress_info['status'] == "OK":
+                wallet_info['address'] = adddress_info['address']
+                for subaddress in adddress_info['addresses']:
+                    if subaddress['used']:
+                        wallet_info['used_subaddresses'].append(subaddress)
+                        # update subaddress balance
+                        subaddress['balance'] = 0.
+                        subaddress['unlocked_balance'] = 0.
+                        for s in per_subaddress:
+                            if s['address_index'] == subaddress['address_index']:
+                                subaddress['balance'] = s['balance']/COIN
+                                subaddress['unlocked_balance'] = s['unlocked_balance']/COIN
+                                break
+                    else:
+                        if subaddress['address_index'] > 0:
+                            wallet_info['new_subaddresses'].append(subaddress)
 
-            wallet_info['used_subaddresses'] = sorted(wallet_info['used_subaddresses'],
-                                                      key=lambda k:k['balance'],
-                                                      reverse=True)
+                wallet_info['used_subaddresses'] = sorted(wallet_info['used_subaddresses'],
+                                                          key=lambda k:k['balance'],
+                                                          reverse=True)
 
-            # auto-generate new subaddresses if not enough available
-            if len(wallet_info['new_subaddresses']) < MAX_NEW_SUBADDRESSES:
-                for _ in range(MAX_NEW_SUBADDRESSES - len(wallet_info['new_subaddresses'])):
-                    new_subaddress = self.wallet_rpc_manager.rpc_request.create_address()
-                    new_subaddress['label'] = ""
-                    new_subaddress['used'] = False
-                    wallet_info['new_subaddresses'].append(new_subaddress)
+                # auto-generate new subaddresses if not enough available
+                if len(wallet_info['new_subaddresses']) < MAX_NEW_SUBADDRESSES:
+                    for _ in range(MAX_NEW_SUBADDRESSES - len(wallet_info['new_subaddresses'])):
+                        new_subaddress = self.wallet_rpc_manager.rpc_request.create_address()
+                        new_subaddress['label'] = ""
+                        new_subaddress['used'] = False
+                        wallet_info['new_subaddresses'].append(new_subaddress)
 
-            if len(wallet_info['new_subaddresses']) > MAX_NEW_SUBADDRESSES:
-                wallet_info['new_subaddresses'] = wallet_info['new_subaddresses'][0:MAX_NEW_SUBADDRESSES]
+                if len(wallet_info['new_subaddresses']) > MAX_NEW_SUBADDRESSES:
+                    wallet_info['new_subaddresses'] = wallet_info['new_subaddresses'][0:MAX_NEW_SUBADDRESSES]
 
 #             print(json.dumps(wallet_info, indent=4))
 
@@ -473,17 +476,23 @@ class MainWebUI(BaseWebUI):
 
 
     def show_new_wallet_ui(self):
-        self.reset_wallet(delete_files=False)
+        if hasattr(self, "update_wallet_info_timer"):
+            self.update_wallet_info_timer.stop()
         if self.wallet_rpc_manager is not None:
-            self.wallet_rpc_manager.reset_block_height()
             self.wallet_rpc_manager.rpc_request.stop_wallet()
-        self.hide_wallet()
+            self.wallet_rpc_manager.reset_block_height()
+            self.wallet_rpc_manager.set_ready(False)
+
+        self.reset_wallet(delete_files=False)
         self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
         self.hub.setNewWalletUI(self.new_wallet_ui)
         self.new_wallet_ui.run()
 
+        self.hide_wallet()
+        self.run_wallet_rpc(2)
 
-    def reset_wallet(self, delete_files=True):
+
+    def reset_wallet(self, delete_files=False):
         wallet_filepath = self.wallet_info.wallet_filepath
         if delete_files and wallet_filepath and os.path.exists(wallet_filepath):
             try:
@@ -632,7 +641,6 @@ class MainWebUI(BaseWebUI):
         self.about()
 
     def _handleAboutToQuit(self):
-        self.hide_wallet()
         log("%s is about to quit..." % APP_NAME, LEVEL_INFO)
         if hasattr(self, "update_daemon_status_timer"):
             self.update_daemon_status_timer.stop()
