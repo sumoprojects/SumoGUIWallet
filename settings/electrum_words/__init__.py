@@ -32,12 +32,12 @@ lojban_lang = Lojban()
 
 def find_seed_language(seed):
     languages = [english_lang, german_lang, spanish_lang, french_lang, italian_lang,
-                 dutch_lang, portuguese_lang, russian_lang, japanese_lang, 
+                 dutch_lang, portuguese_lang, russian_lang, japanese_lang,
                  chinese_simplified_lang, esperanto_lang, lojban_lang]
     seed_list = seed.split(" ")
     for l in languages:
         is_fully_matched, matched_indices = l.match(seed_list)
         if is_fully_matched:
             return l.language_name, " ".join(l.to_english_seed(matched_indices))
-        
+
     return None, None

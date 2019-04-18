@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
+# # Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
 '''
 App logger
 '''
@@ -13,7 +13,7 @@ from common import ensureDir
 
 # Verbosity and log level
 QUIET           = False
-DEBUG           = True
+DEBUG           = False
 DEBUG_PROTOCOL  = False
 INFO            = True
 
@@ -24,26 +24,26 @@ LEVEL_ERROR     = 'error'
 
 def log(message, level, process_name=None):
     '''Conditionally write a message to stdout based on command line options and level.'''
-    
+
     global DEBUG
     global DEBUG_PROTOCOL
     global QUIET
     global INFO
-    
+
     if QUIET and level != LEVEL_ERROR: return
     if not DEBUG_PROTOCOL and level == LEVEL_PROTOCOL: return
     if not DEBUG and level == LEVEL_DEBUG: return
     if not INFO and level == LEVEL_INFO: return
-    
+
     if not process_name:
         log_file = settings.log_file
     else:
         log_file = os.path.join(settings.DATA_DIR, 'logs', "%s.log" % process_name)
-        
+
     ensureDir(log_file)
-    
+
     logger = get_logger(log_file, maxbytes=2*1024*1024) # maxbytes = 2MB
-    
+
     if level == LEVEL_ERROR:
         logger.error(message)
     elif level == LEVEL_DEBUG or level == LEVEL_PROTOCOL:

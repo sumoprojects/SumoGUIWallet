@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-## Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
+# # Copyright (c) 2017-2019, The Sumokoin Project (www.sumokoin.org)
 '''
 New wallet HTML
 '''
@@ -22,29 +22,29 @@ html ="""
                     $('#seed').val(text);
                 });
             }
-            
+
             function create_new_wallet(){
                 app_hub.create_new_wallet();
                 return false;
             }
-            
+
             function restore_wallet(){
                 var seed = $('#seed').val();
                 var restore_height = $('#restore_height_txt').val();
                 var offset_seed_passphrase = $('#offset_seed_passphrase_txt').val();
                 var h =  !isNaN(parseInt(restore_height)) ? parseInt(restore_height) : 0;
                 if(h < 0) h = 0;
-                
+
                 seed = replaceAll(seed, "\\n", " ");
                 app_hub.restore_deterministic_wallet(seed, h, offset_seed_passphrase)
                 return false;
             }
-            
+
             function import_wallet(){
                 app_hub.import_wallet();
                 return false;
             }
-            
+
             function show_progress(header){
                 $('#gen_wallet_btn').disable(true);
                 $('#restore_wallet_btn').disable(true);
@@ -53,7 +53,7 @@ html ="""
                 $('#progress_header').html(header);
                 $('#progress').show();
             }
-            
+
             function show_wallet_info(info_json){
                 var wallet_info = $.parseJSON(info_json);
                 $('#wallet_address').val(wallet_info['address']);
@@ -61,18 +61,18 @@ html ="""
                 $('#wallet_viewkey').val(wallet_info['view_key']);
                 $('#balance').html(wallet_info['balance']);
                 $('#unlocked_balance').html(wallet_info['unlocked_balance']);
-                
+
                 $('#progress').hide();
                 $('#container').show();
                 $('#main_page').hide();
                 $('#wallet_info').show();
             }
-            
+
             function close_dialog(){
                 app_hub.close_new_wallet_dialog();
                 return false;
             }
-            
+
             function reset_ui(){
                 $('#gen_wallet_btn').disable(false);
                 $('#restore_wallet_btn').disable(false);
@@ -82,26 +82,29 @@ html ="""
                 $('#main_page').show();
                 $('#wallet_info').hide();
             }
-            
-            function update_processed_block_height(height, target_height){
+
+            function update_processed_block_height(height, target_height, block_hash){
                 var html = height;
                 if(target_height > 0 && target_height > height){
                     sync_pct = target_height > 0 ? (height*100.0/target_height).toFixed(1) : 0;
-                    html = height + "/" + target_height + " (" + sync_pct + "%)";
+                    $('#progress_header').html("Restoring wallet..." + " (" + sync_pct + "%)");
+                    html = height + "/" + target_height;
+                    $('#processing_block').show();
                 }
                 $('#processed_block_height').html(html);
+                $('#processed_block_hash').html('< ' + block_hash + ' >');
             }
-            
+
             function paste_seed(){
                 app_hub.paste_seed_words();
                 return false;
             }
-            
+
             function copy_seed(){
                 app_hub.copy_seed($('#wallet_seed_words').val());
                 return false;
             }
-            
+
         </script>
         <link href="./css/bootstrap.min.css" rel="stylesheet">
         <link href="./css/font-awesome.min.css" rel="stylesheet">
@@ -111,12 +114,12 @@ html ="""
                 -moz-box-sizing: border-box;
                 box-sizing: border-box;
             }
-            
+
             body {
                 /* Disable text selection */
                 -webkit-user-select: none;  /* webkit all */
                 user-select: none;          /* regular */
-              
+
                 cursor: default;
                 background-color: #666;
                 color: #76A500;
@@ -129,52 +132,52 @@ html ="""
                 height: 100%;
                 overflow: hidden;
             }
-            
+
             a, a:hover, a:active, a:focus {
                 text-decoration: none;
                 outline: 0;
                 cursor: default;
             }
-            
+
             a, a:active, a:focus{
                 color: #337AB7;
             }
-            
+
             a:hover{
                 color: #fff;
             }
-            
-            
-                        
+
+
+
             table {
                 border-spacing: 0;
                 border-collapse: collapse;
                 font-size: 90%;
             }
-            
-            
+
+
             table thead tr{
                 height: 4.5em;
             }
-            
+
             table tbody tr {
                 color: #aaa;
                 height: 6em;
                 line-height: 1.6em;
                 border-top: 1px solid #aaa;
             }
-            
+
             table thead tr th{
                 text-align: center;
                 border-bottom: 1px solid #aaa;
                 text-size: 18px;
                 padding: auto 1em;
             }
-            
+
             table tr td {
                 text-align: center;
             }
-            
+
             .row {
                 margin: 5px;
             }
@@ -182,7 +185,7 @@ html ="""
                 background: #fff;
                 padding: 10px 30px;
             }
-            
+
             input[type="file"] {
                 display: inline-block;
                 visibility: hidden;
@@ -193,7 +196,7 @@ html ="""
                 padding: 6px 12px;
                 cursor: pointer;
             }
-            
+
             .centered {
               position: fixed;
               width: 730px;
@@ -203,7 +206,7 @@ html ="""
               /* bring your own prefixes */
               transform: translate(-50%, -50%);
             }
-            
+
             #progress {
                 background:#fff;
                 width:800px;
@@ -212,42 +215,43 @@ html ="""
                 text-align:center;
                 display:none;
             }
-            
+
             .progress{
                 height: 22px;
                 text-align: center;
                 background: #ddd;
             }
-            
-            #progress_bar_text_high{
-                font-size: 90%; 
+
+            #progress_header{
+                margin-bottom: 20px;
+            }
+
+            #processing_block{
                 display: none;
+                font-family: Consolas, "Courier New", monospace;
+                margin-top: 20px;
+                font-size: 16px;
             }
-            
-            #progress_bar_text_low{
-                font-size: 80%;
-                color: #c7254e;
-            }
-            
+
             .form-control.address-box{
                 font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
                 font-size: 85%;
                 /*color: #c7254e;*/
                 color: #000;
             }
-            
+
             .container{
                 padding: 0;
                 width: 100%;
             }
-            
+
             textarea{
                 border:none;
                 width:100%;
                 resize:none;
                 font-weight:bold;
             }
-            
+
             .form-group h5 i{
                 color: #76A500;
                 font-style: normal;
@@ -275,7 +279,7 @@ html ="""
                             <textarea id="seed" class="form-control" placeholder="Paste 26 mnemonic seed words here (use [Paste] button above or press Ctrl+V)" style="height:80px;margin-bottom:10px;margin-top:10px;font-size:100%"></textarea>
                             <button id="restore_wallet_btn" type="button" class="btn btn-primary" onclick="restore_wallet()"><i class="fa fa-undo"></i> Restore</button>
                             <input id="restore_height_txt" type="text" class="form-control" style="display: inline-block; float:right; width: 70px" value="0"/> <label for="restore_height_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Restore from height#</label>
-                            <input id="offset_seed_passphrase_txt" type="password" class="form-control" style="display: inline-block; float:right; width: 180px" value=""/> <label for="offset_seed_passphrase_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Offset seed passphrase</label> 
+                            <input id="offset_seed_passphrase_txt" type="password" class="form-control" style="display: inline-block; float:right; width: 180px" value=""/> <label for="offset_seed_passphrase_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Offset seed passphrase</label>
                         </div>
                     </div>
                 </div>
@@ -330,9 +334,11 @@ html ="""
     <div id="progress">
         <div class="centered">
             <h3 id="progress_header">Creating/Restoring wallet...</h3>
-            <h5 id="processing_block">Processing block#: <code id="processed_block_height">0</code></h5><br/><br/>
-            <!--<img src="./images/ajax-loader2.gif" />-->
             <i class="fa fa-refresh fa-spin fa-3x fa-fw"></i>
+            <div id="processing_block">
+                Processed block: <span id="processed_block_height">0</span><br>
+                <span id="processed_block_hash"></span>
+            </div>
         </div>
     </div>
     </body>

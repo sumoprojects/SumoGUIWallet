@@ -1634,13 +1634,13 @@ class LanguageBase(object):
         "zones",
         "zoom"
     ]
-            
+
     def __init__(self, language_name, prefix):
         self.language_name = language_name
         self.prefix = prefix
         self.my_word_list = None
-    
-     
+
+
     def match(self, seed):
         matched_indices = []
         for s in seed[:24]:
@@ -1653,28 +1653,28 @@ class LanguageBase(object):
                     break
                 index += 1
             if not found:
-                break      
-                           
-        return len(matched_indices) >= 24 , matched_indices # return (is fully matched, match indices)
-    
-    
+                break
+
+        return len(matched_indices) >= 24 , matched_indices  # return (is fully matched, match indices)
+
+
     def to_english_seed(self, matched_indices):
         english_seed = []
         for i in matched_indices:
             english_seed.append(self.english_word_list[i])
-        
+
         return english_seed
-    
+
 
 class English(LanguageBase):
     def __init__(self):
         super(English, self).__init__("English", 3)
         self.my_word_list = super(English, self).english_word_list
-    
-
-    
-    
-    
 
 
-    
+
+
+
+
+
+
