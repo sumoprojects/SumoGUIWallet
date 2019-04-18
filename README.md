@@ -1,11 +1,10 @@
-# Sumokoin GUI Wallet
+# Sumo GUI Wallet
 
-Copyright (c) 2017, Sumokoin.org
+Copyright (c) 2017-2019, Sumokoin Project (www.sumokoin.org)
 
 **One of the most easy-to-use, intuitive GUI (full) wallets in crypto.**
 
-![](https://www.sumokoin.org/images/sumokoin-gui-wallet-v0.0.1-b2.png)
-
+![](http://images.sumokoin.org/sumokoin-gui-wallet-v0.2.0.png)
 
 # Installation & running from source codes
 
