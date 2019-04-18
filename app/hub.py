@@ -202,21 +202,8 @@ class Hub(QObject):
                 else:
                     break
                 
-             has_name = False
-            while True:
-                wallet_name, res = self._custom_input_dialog(self.new_wallet_ui, 'Wallet Name', 'Set wallet name:')
-                if not res:
-                    break
-                if res and wallet_name:
-                    wallet_filepath = os.path.join(wallet_dir_path, wallet_name)
-                    if os.path.isfile(wallet_filepath):
-                        QMessageBox.warning(self.new_wallet_ui, 'Wallet Name', 'Wallet with the same name already exists. Please choose a different name.')
-                        continue
-                    has_name = True
-                    break
-                        
-             if has_password and has_name:
-                 if not mnemonic_seed: # i.e. create new wallet
+            if has_password:
+                if not mnemonic_seed: # i.e. create new wallet
                     mnemonic_seed_language = "1" # english
                     seed_language_list = [sl[1] for sl in seed_languages]
                     list_select_index = 0 if sys.platform in ['win32','cygwin','win64'] else 1
