@@ -102,7 +102,6 @@ class Hub(QObject):
         self.on_new_wallet_show_progress_event.emit('Importing wallet...')
         self.app_process_events()
 
-        self.ui.run_wallet_rpc(2)
         ret = self.ui.wallet_rpc_manager.rpc_request.open_wallet(
                                             os.path.basename(new_wallet_file),
                                             wallet_password)
@@ -113,7 +112,6 @@ class Hub(QObject):
                     'Error Importing Wallet',\
                     "Error: %s" % error_message)
             self.ui.reset_wallet()
-            self.ui.wallet_rpc_manager.rpc_request.stop_wallet()
             return False
 
         self.current_block_height = 0 # reset current wallet block height
@@ -186,11 +184,12 @@ class Hub(QObject):
                     return
 
                 self.on_new_wallet_show_progress_event.emit("Creating wallet...")
-                self.app_process_events()
+                self.app_process_events(0.1)
                 wallet_filename = self.get_new_wallet_file_name()
                 wallet_filepath = os.path.join(wallet_dir_path, wallet_filename)
 
-                self.ui.run_wallet_rpc(2)
+                while not self.ui.wallet_rpc_manager.is_ready():
+                    self.app_process_events(0.1)
                 ret = self.ui.wallet_rpc_manager.rpc_request.create_wallet(wallet_filename,
                                                                      wallet_password,
                                                                      mnemonic_seed_language)
@@ -270,11 +269,12 @@ class Hub(QObject):
 
             if has_password:
                 self.on_new_wallet_show_progress_event.emit("Restoring wallet...")
-                self.app_process_events()
+                self.app_process_events(0.1)
                 wallet_filename = self.get_new_wallet_file_name()
                 wallet_filepath = os.path.join(wallet_dir_path, wallet_filename)
 
-                self.ui.run_wallet_rpc(2)
+                while not self.ui.wallet_rpc_manager.is_ready():
+                    self.app_process_events(0.1)
                 ret = self.ui.wallet_rpc_manager.rpc_request.restore_deterministic_wallet(english_seed,
                             restore_height, wallet_filename, seed_offset_passphrase, wallet_password, "English")
                 if ret['status'] == "ERROR":
@@ -305,7 +305,7 @@ class Hub(QObject):
                     h = self.ui.wallet_rpc_manager.get_block_height()
                     if h >  self.current_block_height:
                         block_hash = self.ui.wallet_rpc_manager.get_block_hash()
-                        self.on_new_wallet_update_processed_block_height_event.emit(h, self.ui.target_height, block_hash)
+                        self.on_new_wallet_update_processed_block_height_event.emit(h, self.ui.current_height, block_hash)
                         self.current_block_height = h
                         counter = 0
                     counter += 1
@@ -578,9 +578,9 @@ class Hub(QObject):
 
 
     @Slot()
-    def open_new_wallet(self):
+    def new_wallet_ui(self):
         result = QMessageBox.question(self.ui, "Open/Create New Wallet", \
-                                      "<b>This will close current wallet and open/create new wallet!</b><br><br>Are you sure to continue?", \
+                                      "<b>This will close current wallet to create/restore a new wallet!</b><br><br>Are you sure to continue?", \
                                        QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
         if result == QMessageBox.No:
             return
@@ -598,7 +598,7 @@ class Hub(QObject):
         ret = self.ui.wallet_rpc_manager.rpc_request.close_wallet()
         if ret['status'] == "ERROR":
             error_message = ret['message']
-            QMessageBox.critical(self.new_wallet_ui, \
+            QMessageBox.critical(self.ui, \
                     'Error Closing Current Wallet',\
                     "Error: %s" % error_message)
             return
@@ -607,7 +607,110 @@ class Hub(QObject):
         self.ui.show_new_wallet_ui()
 
 
-    @Slot(str)
+    @Slot()
+    def open_existing_wallet(self):
+        current_wallet_password, result = self._custom_input_dialog(self.ui, \
+                        "Wallet Password", "Current wallet password:", QLineEdit.Password)
+        if not result:
+            return
+
+        if hashlib.sha256(current_wallet_password).hexdigest() != self.ui.wallet_info.wallet_password:
+            QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
+            return
+
+        dlg = QFileDialog(self.ui, "Open Wallet File", wallet_dir_path, "Wallet files (*.bin)")
+        dlg.setFileMode(QFileDialog.ExistingFile)
+        wallet_filename = None
+        if dlg.exec_():
+            wallet_filename = dlg.selectedFiles()[0]
+        else:
+            self.on_open_existing_wallet_complete_event.emit()
+            return
+        if not wallet_filename:
+            return
+
+        wallet_key_filename = wallet_filename + '.keys'
+        if not os.path.exists(wallet_key_filename):
+            QMessageBox.warning(self.ui, \
+                'Open Wallet File',\
+                 """Error: Key file does not exist!<br>
+                 Please make sure to select correct wallet file""")
+            return
+
+        if os.path.normpath(os.path.dirname(wallet_filename)) != os.path.normpath(wallet_dir_path):
+            QMessageBox.warning(self.ui, \
+                'Open Wallet File',\
+                 """Error: Only wallet files at default location are available for opening""")
+            return
+
+        while True:
+            wallet_password, result = self._custom_input_dialog(self.ui, \
+                "Wallet Password", "Enter wallet password for opening:", QLineEdit.Password)
+            if result:
+                if not wallet_password:
+                    QMessageBox.warning(self.ui, \
+                            'Wallet Password',\
+                             "You must provide password to open wallet")
+                    continue
+                else:
+                    break
+            else:
+                return
+
+        self.ui.update_wallet_info_timer.stop()
+        self.on_open_existing_wallet_start_event.emit()
+        current_wallet_filename = self.ui.wallet_info.wallet_filepath
+        try:
+            ret = self.ui.wallet_rpc_manager.rpc_request.stop_wallet()
+            if ret['status'] == "ERROR":
+                error_message = ret['message']
+                QMessageBox.critical(self.ui, \
+                        'Error Closing Current Wallet',\
+                        "Error: %s" % error_message)
+                raise Exception(error_message)
+
+            self.ui.wallet_rpc_manager.set_ready(False)
+            self.ui.run_wallet_rpc(2)
+            while not self.ui.wallet_rpc_manager.is_ready():
+                self.app_process_events(0.1)
+
+            ret = self.ui.wallet_rpc_manager.rpc_request.open_wallet(
+                                                os.path.basename(wallet_filename),
+                                                wallet_password)
+            if ret['status'] == "ERROR":
+                error_message = ret['message']
+                QMessageBox.critical(self.ui, 'Error Opening Wallet', error_message)
+                raise Exception(error_message)
+
+            self.ui.reset_wallet(False)
+            self.ui.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
+            self.ui.wallet_info.wallet_filepath = wallet_filename
+            self.ui.wallet_info.is_loaded =True
+            self.ui.wallet_info.save()
+
+            self.app_process_events(5)
+            while not self.ui.wallet_rpc_manager.is_ready():
+                self.app_process_events(0.1)
+            self.ui.update_wallet_info()
+            self.app_process_events(0.1)
+            self.on_open_existing_wallet_complete_event.emit()
+            QMessageBox.information(self.ui, "Wallet Loaded", "Wallet ["
+                                    + os.path.basename(wallet_filename) + "] successfully loaded")
+        except Exception, err:
+            log(str(err), LEVEL_ERROR)
+            ret = self.ui.wallet_rpc_manager.rpc_request.open_wallet(
+                                                os.path.basename(current_wallet_filename),
+                                                current_wallet_password)
+            self.ui.wallet_info.wallet_password = hashlib.sha256(current_wallet_password).hexdigest()
+            self.ui.wallet_info.wallet_filepath = current_wallet_filename
+            self.ui.wallet_info.is_loaded =True
+            self.ui.wallet_info.save()
+            self.on_open_existing_wallet_complete_event.emit()
+        finally:
+            self.ui.update_wallet_info_timer.start()
+
+
+    @Slot(int)
     def view_wallet_key(self, key_type):
         wallet_password, result = self._custom_input_dialog(self.ui, \
                         "Wallet Password", "Please enter wallet password:", QLineEdit.Password)
@@ -620,16 +723,82 @@ class Hub(QObject):
             QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
             return
 
-        ret = self.ui.wallet_rpc_manager.rpc_request.query_key(key_type)
-        title = "Wallet Key"
-        if key_type == "mnemonic":
-            title = "Wallet mnemonic seed"
-        if key_type == "view_key":
-            title = "Wallet view-key"
-        if key_type == "spend_key":
-            title = "Wallet spend-key"
+        title = None
+        if key_type == 1:
+            title = "Wallet Mnemonic Seed"
+            ret = self.ui.wallet_rpc_manager.rpc_request.query_key("mnemonic")
+        elif key_type == 2:
+            title = "Wallet Viewkey"
+            ret = self.ui.wallet_rpc_manager.rpc_request.query_key("view_key")
+        elif key_type == 3:
+            title = "Wallet Spendkey"
+            ret = self.ui.wallet_rpc_manager.rpc_request.query_key("spend_key")
+        else:
+            QMessageBox.critical(self.ui, "Unknown Key Type", "Unknown key type");
+            return
 
         self.on_view_wallet_key_completed_event.emit(title, ret)
+
+    @Slot()
+    def change_wallet_password(self):
+        old_password, result = self._custom_input_dialog(self.ui, \
+                        "Wallet Password", "Enter current wallet password:", QLineEdit.Password)
+        if not result:
+            return
+
+        if hashlib.sha256(old_password).hexdigest() != self.ui.wallet_info.wallet_password:
+            self.on_view_wallet_key_completed_event.emit("", "");
+            QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
+            return
+
+        new_password = None
+        while True:
+            new_password, result = self._custom_input_dialog(self.ui, \
+                    "Wallet New Password", "Set new wallet password:", QLineEdit.Password)
+            if result:
+                if not password_regex.match(new_password):
+                    QMessageBox.warning(self.ui, \
+                        'Wallet New Password',\
+                         "Password must contain at least 1 character [a-zA-Z] or number [0-9]\
+                                    <br>or special character like !@#$%^&* and not contain spaces")
+                    continue
+
+                confirm_password, result = self._custom_input_dialog(self.ui, \
+                    'Wallet New Password', \
+                    "Confirm new wallet password:", QLineEdit.Password)
+                if result:
+                    if confirm_password != new_password:
+                        QMessageBox.warning(self.ui, \
+                            'Wallet New Password',\
+                             "Confirm password does not match new password!\
+                                             <br>Please re-enter password")
+                        continue
+                    else:
+                        break
+                else:
+                    return
+            else:
+                return
+
+        if new_password is not None:
+            if new_password == old_password:
+                QMessageBox.information(self.ui, "Wallet Password",
+                "New wallet password is the same as old one. Nothing changed!")
+                return
+
+            ret = self.ui.wallet_rpc_manager.rpc_request.change_wallet_password(old_password, new_password)
+            if ret['status'] == "ERROR":
+                error_message = ret['message']
+                QMessageBox.critical(self.ui, \
+                        'Error Changing Wallet Password',\
+                        "Error: %s" % error_message)
+                return
+
+            self.ui.wallet_info.wallet_password = hashlib.sha256(new_password).hexdigest()
+            self.ui.wallet_info.save()
+
+            QMessageBox.information(self.ui, "Wallet Password Changed",
+                "Wallet password successfully changed!<br>Please make sure you never lose it.")
 
 
     @Slot(int)
@@ -658,10 +827,14 @@ class Hub(QObject):
 
     @Slot()
     def restart_daemon(self):
-        self.app_process_events(1)
+        self.app_process_events(0.1)
         self.ui.sumokoind_daemon_manager.stop()
         self.ui.start_deamon()
-        self.app_process_events(5)
+        while True:
+            sumokoind_info = self.ui.daemon_rpc_request.get_info()
+            if sumokoind_info['status'] == "OK":
+                break;
+            self.app_process_events(1)
         self.on_restart_daemon_completed_event.emit()
 
 
@@ -693,7 +866,7 @@ class Hub(QObject):
         h = self.ui.wallet_rpc_manager.get_block_height()
         if h > self.current_block_height:
             block_hash = self.ui.wallet_rpc_manager.get_block_hash()
-            self.on_update_wallet_loading_height_event.emit(h, self.ui.target_height, block_hash)
+            self.on_update_wallet_loading_height_event.emit(h, self.ui.current_height, block_hash)
             self.current_block_height = h
 
     @Slot(bool)
@@ -753,11 +926,11 @@ class Hub(QObject):
     def show_wallet_info(self):
         wallet_rpc_request = self.ui.wallet_rpc_manager.rpc_request
         wallet_info = {}
-        address_obj = wallet_rpc_request.get_address()
-        if 'address' in address_obj:
-            wallet_info['address'] = address_obj['address']
+        ret = wallet_rpc_request.get_address()
+        if ret['status'] == "OK" and 'address' in ret:
+            wallet_info['address'] = ret['address']
         else:
-            wallet_info['address'] = "Sumo???"
+            wallet_info['address'] = ""
         wallet_info['seed'] = wallet_rpc_request.query_key(key_type="mnemonic")
         wallet_info['view_key'] = wallet_rpc_request.query_key(key_type="view_key")
         balance, unlocked_balance, _ = wallet_rpc_request.get_balance()
@@ -787,3 +960,5 @@ class Hub(QObject):
     on_restart_daemon_completed_event = Signal()
     on_paste_seed_words_event = Signal(str)
     on_update_wallet_loading_height_event = Signal(int, int, str)
+    on_open_existing_wallet_start_event = Signal()
+    on_open_existing_wallet_complete_event = Signal()

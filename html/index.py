@@ -383,6 +383,9 @@ html =u"""
                 font-size: 14px;
             }
 
+            .progress-bar-success{
+                background-color: #0c7cd5;
+            }
         </style>
 
         <script src="./scripts/jquery-1.9.1.min.js"></script>
@@ -391,14 +394,14 @@ html =u"""
         <script src="./scripts/jquery.qrcode.min.js"></script>
         <script src="./scripts/utils.js"></script>
         <script type="text/javascript">
-
+            var block_sync_size = 20;
             function app_ready(){
                 setTimeout(app_hub.load_app_settings, 2000);
                 app_hub.on_load_app_settings_completed_event.connect(function(app_settings_json){
                     var app_settings = $.parseJSON(app_settings_json);
                     var log_level = app_settings['daemon']['log_level'];
                     $('#daemon_log_level_' + log_level).prop('checked', true);
-                    var block_sync_size = app_settings['daemon']['block_sync_size'];
+                    block_sync_size = app_settings['daemon']['block_sync_size'];
                     $('#block_sync_size_' + block_sync_size).prop('checked', true);
 
                     $('#minimize_to_tray_chk').prop('checked', app_settings['application']['minimize_to_tray']);
@@ -407,12 +410,7 @@ html =u"""
                     $('#down_speed_limit_select').val(app_settings['daemon']['limit_rate_down']);
                 });
 
-                app_hub.on_main_wallet_ui_reset_event.connect(function(){
-                    setTimeout(function(){
-                        location.reload();
-                    }, 5000);
-                });
-
+                app_hub.on_main_wallet_ui_reset_event.connect(reset_wallet_ui);
                 app_hub.on_daemon_update_status_event.connect(update_daemon_status);
                 app_hub.on_wallet_update_info_event.connect(update_wallet_info);
                 app_hub.on_wallet_rescan_spent_completed_event.connect(function(){
@@ -624,11 +622,11 @@ html =u"""
 
                 app_hub.on_update_wallet_loading_height_event.connect(function(height, target_height, block_hash){
                     // console.log(block_hash);
-                    //if(!$('#app_modal_progress').is(':visible')){
-                    //    return;
-                    //}
+                    if(!$('#app_modal_progress').is(':visible') && height > target_height - block_sync_size){
+                        return;
+                    }
 
-                    if(height < target_height - 2){
+                    if(height < target_height){
                         show_app_progress("Loading wallet...");
                         msg = "<pre>Processed block: " + height;
                         if( target_height > 0 ){
@@ -645,6 +643,30 @@ html =u"""
                         $('#app_modal_progress_subtext').hide();
                     }
                 });
+
+                app_hub.on_open_existing_wallet_start_event.connect(function(){
+                    show_progress("Opening wallet...");
+                });
+
+                app_hub.on_open_existing_wallet_complete_event.connect(function(){
+                    hide_progress();
+                });
+            }
+
+            function reset_wallet_ui(){
+                setTimeout(function(){
+                    activate_tab('balance_tab');
+                    balance_span.html( printMoney(0) );
+                    unlocked_balance_span.html( printMoney(0) );
+                    recent_txs_div.html('');
+
+                    receive_address.val('');
+                    $('#table_new_subaddresses tbody').html('');
+
+                    current_tx_history_page = 1;
+                    $('#table_tx_history tbody').html('');
+                    $('#tx_history_pages').html('');
+                }, 1);
             }
 
             function delete_address(index){
@@ -809,9 +831,11 @@ html =u"""
 
                 }, 1);
 
-                setTimeout(function(){
-                    hide_app_progress();
-                }, 3000);
+                if($('#app_modal_progress').is(':visible')){
+                    setTimeout(function(){
+                        hide_app_progress();
+                    }, 1000);
+                }
             }
 
             function show_qrcode(text){
@@ -975,25 +999,40 @@ html =u"""
                 return false;
             }
 
-
             function show_address_book(){
                 show_progress("Loading address book...");
                 app_hub.load_address_book();
                 return false;
             }
 
-            function open_new_wallet(){
-                app_hub.open_new_wallet();
+            function open_wallet(){
+                app_hub.open_existing_wallet();
                 return false;
             }
 
-            function view_wallet_key(key_type){
-                app_hub.view_wallet_key(key_type);
+            function create_new_wallet(){
+                app_hub.new_wallet_ui();
+                return false;
+            }
+
+            function view_wallet_key(){
+                var html = '<h5>View wallet mnemonic seed/private keys</h5>';
+                html += '<div class="col-lg-12 wallet-settings" style="padding-top: 20px">';
+                html += '<button id="btn_view_viewkey" type="button" class="btn btn-primary btn-sm" onclick="app_hub.view_wallet_key(1)"><i class="fa fa-leaf"></i> Mnemonic seed...</button>';
+                html += '<button id="btn_view_viewkey" type="button" class="btn btn-primary btn-sm" onclick="app_hub.view_wallet_key(2)"><i class="fa fa-eye"></i> View key...</button>';
+                html += '<button id="btn_view_spendkey" type="button" class="btn btn-primary btn-sm" onclick="app_hub.view_wallet_key(3)"><i class="fa fa-key"></i> Spend key...</button>';
+                html += '</div>';
+                show_app_dialog(html, true);
+                return false;
+            }
+
+            function change_wallet_password(){
+                app_hub.change_wallet_password();
                 return false;
             }
 
             function set_daemon_log_level(level){
-                console.log(level);
+                //console.log(level);
                 app_hub.set_daemon_log_level(level);
             }
 
@@ -1006,10 +1045,16 @@ html =u"""
                 return false;
             }
 
-            function show_app_dialog(msg, title){
+            function show_app_dialog(msg, hide_copy_button){
                 $('#app_model_body').css("color", "#666");
                 $('#app_model_body').html(msg);
-                $('#btn_copy').text('Copy');
+                if(hide_copy_button){
+                    $('#btn_copy').hide();
+                }
+                else{
+                    $('#btn_copy').text('Copy');
+                    $('#btn_copy').show();
+                }
                 $('#app_modal_dialog').modal('show');
             }
 
@@ -1056,6 +1101,10 @@ html =u"""
                 app_hub.copy_text( $('#app_model_body .copied').text() );
                 $('#btn_copy').text('Copied');
             }
+
+            function activate_tab(tab){
+              $('.nav-tabs a[href="#' + tab + '"]').tab('show');
+            };
 
             $(document).ready(function(){
                 progress_bar_text_low = $('#progress_bar_text_low');
@@ -1357,11 +1406,11 @@ html =u"""
                 <div id="settings_tab" class="tab-pane fade">
                     <h3>WALLET</h3>
                     <div class="row">
-                        <div class="col-sm-12 wallet-settings">
-                            <button id="btn_new_wallet" type="button" class="btn btn-primary" onclick="open_new_wallet()"><i class="fa fa-file"></i> New Wallet...</button>
-                            <button id="btn_view_seed" type="button" class="btn btn-primary" onclick="view_wallet_key('mnemonic')"><i class="fa fa-eye"></i> Mnemonic Seed...</button>
-                            <button id="btn_view_viewkey" type="button" class="btn btn-primary" onclick="view_wallet_key('view_key')"><i class="fa fa-key"></i> Viewkey...</button>
-                            <button id="btn_view_spendkey" type="button" class="btn btn-primary" onclick="view_wallet_key('spend_key')"><i class="fa fa-key"></i> Spendkey...</button>
+                        <div class="col-lg-12 wallet-settings">
+                            <button id="btn_open_wallet" type="button" class="btn btn-primary" onclick="open_wallet()"><i class="fa fa-folder-open"></i> Open...</button>
+                            <button id="btn_new_wallet" type="button" class="btn btn-primary" onclick="create_new_wallet()"><i class="fa fa-file"></i> New...</button>
+                            <button id="btn_view_seed" type="button" class="btn btn-primary" onclick="view_wallet_key('mnemonic')"><i class="fa fa-eye"></i> View Seed/Keys...</button>
+                            <button id="btn_change_password" type="button" class="btn btn-primary" onclick="change_wallet_password()"><i class="fa fa-key"></i> Change Password</button>
                         </div>
                     </div>
                     <hr style="margin-top:10px;margin-bottom:10px;">
@@ -1477,8 +1526,8 @@ html =u"""
                                 </form>
                             </div>
                             <div class="col-sm-12 wallet-settings" style="margin-top: 0px; text-align:center;">
-                                <button id="btn_restart_daemon" type="button" class="btn btn-primary" onclick="restart_daemon()"><i class="fa fa-refresh"></i> Apply (Restart Daemon)</button>
-                                <button id="btn_view_log" type="button" class="btn btn-primary" onclick="app_hub.view_daemon_log()"><i class="fa fa-file"></i> View Log...</button>
+                                <button id="btn_restart_daemon" type="button" class="btn btn-primary" onclick="restart_daemon()">Apply (Restart Daemon)</button>
+                                <button id="btn_view_log" type="button" class="btn btn-primary" onclick="app_hub.view_daemon_log()">View Daemon Log...</button>
                             </div>
                         </div>
                     </div>

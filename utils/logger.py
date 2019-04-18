@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# # Copyright (c) 2017, The Sumokoin Project (www.sumokoin.org)
+# # Copyright (c) 2017-2019, The Sumokoin Project (www.sumokoin.org)
 '''
 App logger
 '''
@@ -45,7 +45,7 @@ def log(message, level, process_name=None):
     logger = get_logger(log_file, maxbytes=2*1024*1024) # maxbytes = 2MB
 
     if level == LEVEL_ERROR:
-        logger.error(message)
+        logger.error(message, exc_info=True)
     elif level == LEVEL_DEBUG or level == LEVEL_PROTOCOL:
         logger.debug(message)
     else:

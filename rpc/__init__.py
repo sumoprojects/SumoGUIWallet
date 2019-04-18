@@ -147,16 +147,13 @@ class WalletRPCRequest():
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
             return res['key']
-        return res['status']
+        return ""
 
     def get_address(self, account_index = 0):
         params = {"account_index": account_index}
         rpc_input = {"method": "getaddress",
                      "params": params}
-        res = self.send_request(rpc_input)
-        if res['status'] == 'OK':
-            return res
-        return res['status']
+        return self.send_request(rpc_input)
 
     def create_address(self):
         rpc_input = {"method":"create_address"}
@@ -306,4 +303,11 @@ class WalletRPCRequest():
 
     def get_version(self):
         rpc_input = {"method":"get_version"}
+        return self.send_request(rpc_input)
+
+    def change_wallet_password(self, old_password, new_password):
+        rpc_input = {"method":"change_wallet_password"}
+        params = {"old_password": old_password,
+                  "new_password": new_password}
+        rpc_input["params"] = params
         return self.send_request(rpc_input)
