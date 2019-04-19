@@ -142,12 +142,18 @@ class WalletRPCRequest():
         if no_wait: return None
         return req.get_result()
 
-    def query_key(self, key_type="mnemonic"):
-        rpc_input = {"method":"query_key", "params": {"key_type": key_type}}
+    def query_key(self, key_type, passphrase=""):
+        rpc_input = {"method":"query_key",
+                     "params": {"key_type": key_type,
+                                "passphrase": passphrase}
+                    }
         res = self.send_request(rpc_input)
         if res['status'] == 'OK':
             return res['key']
-        return ""
+        elif res['status'] == 'ERROR':
+            return res['message']
+        else:
+            return ""
 
     def get_address(self, account_index = 0):
         params = {"account_index": account_index}

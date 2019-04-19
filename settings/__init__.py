@@ -20,7 +20,7 @@ _data_dir = makeDir(os.path.join(getHomeDir(), 'SumoGUIWallet'))
 DATA_DIR = _data_dir
 
 log_file = os.path.join(DATA_DIR, 'logs', 'app.log')  # default logging file
-log_level = logging.DEBUG  # logging level
+log_level = logging.INFO  # logging level
 
 seed_languages = [("German", u"Deutsch"),
                   ("English", u"English"),
