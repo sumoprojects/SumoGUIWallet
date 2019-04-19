@@ -367,7 +367,6 @@ class Hub(QObject):
                                       "Are you sure to send coins without Payment ID?", \
                                        QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
             if result == QMessageBox.No:
-                self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Sending coin cancelled"}')
                 return
 
         if sweep_all:
@@ -375,21 +374,20 @@ class Hub(QObject):
                                       "This will send all your coins to target address.<br><br>Are you sure you want to proceed?", \
                                       QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
             if result == QMessageBox.No:
-                self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Sending coin cancelled"}')
                 return
 
         wallet_password, result = self._custom_input_dialog(self.ui, \
                         "Wallet Password", "Please enter wallet password:", QLineEdit.Password)
 
         if not result:
-            self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Wrong wallet password"}');
             return
 
         if hashlib.sha256(wallet_password).hexdigest() != self.ui.wallet_info.wallet_password:
-            self.on_wallet_send_tx_completed_event.emit('{"status": "CANCELLED", "message": "Wrong wallet password"}');
             QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
             return
 
+
+        self.on_wallet_send_tx_start_event.emit()
         amount = int(amount*COIN)
 
         if sweep_all:
@@ -977,3 +975,4 @@ class Hub(QObject):
     on_update_wallet_loading_height_event = Signal(int, int, str)
     on_open_existing_wallet_start_event = Signal()
     on_open_existing_wallet_complete_event = Signal()
+    on_wallet_send_tx_start_event = Signal()

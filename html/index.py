@@ -425,6 +425,10 @@ html =u"""
                     hide_progress();
                 });
 
+                app_hub.on_wallet_send_tx_start_event.connect(function(){
+                    show_progress("Sending coins... This can take a while. Please be patient...");
+                });
+
                 app_hub.on_wallet_send_tx_completed_event.connect(function(status_json){
                     var status = $.parseJSON(status_json);
                     if(status['status'] == "OK"){
@@ -942,7 +946,6 @@ html =u"""
                 var mixin = $('#send_mixins').val();
 
                 btn_send_tx.disable(true);
-                show_progress("Sending coins... This can take a while for big amount...");
                 app_hub.send_tx(amount, address, payment_id, priority, mixin, tx_desc, $('#checkbox_save_address').is(":checked"), sweep_all);
                 return false;
             }
@@ -1066,6 +1069,7 @@ html =u"""
                 $('#app_model_body').css("color", "#c7254e");
                 $('#app_model_body').html(msg);
                 $('#app_modal_dialog').modal('show');
+                $('#btn_copy').hide();
             }
 
             function show_app_progress(msg){
@@ -1329,16 +1333,13 @@ html =u"""
                             </div>
                             <div class="form-group">
                                 <div class="col-sm-6">
-                                    <label for="send_mixins" class="col-xs-4 control-label">Privacy <sup>1</sup></label>
+                                    <label for="send_mixins" class="col-xs-4 control-label">Ringsize <sup>1</sup></label>
                                     <div class="col-xs-8">
                                         <select id="send_mixins" class="form-control">
-                                          <option value="12" selected>12 mixins (default)</option>
-                                          <option value="15">15 mixins</option>
-                                          <option value="18">18 mixins</option>
-                                          <option value="24">24 mixins</option>
-                                          <option value="36">36 mixins</option>
-                                          <option value="48">48 mixins</option>
-                                          <option value="60">60 mixins</option>
+                                          <option value="48" selected>49 (default)</option>
+                                          <option value="60">61</option>
+                                          <option value="72">73</option>
+                                          <option value="96">97</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1361,8 +1362,8 @@ html =u"""
                                     <label class="col-xs-2 control-label sr-only">&nbsp;</label>
                                     <div class="col-xs-10">
                                         <input id="checkbox_save_address" type="checkbox" /> <label for="checkbox_save_address">Save address (with payment id) to address book</label>
-                                        <label style="color:#999"><small>1. Higher mixin (ringsize) means higher transaction cost, using default mixin# (12) is recommended</small></label>
-                                        <label style="color:#999"><small>2. Only choose higher priority when there are many transactions in tx pool or "Normal" works just fine</small></label>
+                                        <label style="color:#999; font-size: 95%">1. Larger ringsize means higher transaction cost, using default ringsize (49) is highly recommended</label>
+                                        <label style="color:#999; font-size: 95%">2. Only choose higher priority when there are many transactions in tx pool or "Normal" works just fine</label>
                                     </div>
                                 </div>
                             </div>
