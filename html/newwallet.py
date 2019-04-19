@@ -31,12 +31,12 @@ html ="""
             function restore_wallet(){
                 var seed = $('#seed').val();
                 var restore_height = $('#restore_height_txt').val();
-                var offset_seed_passphrase = $('#offset_seed_passphrase_txt').val();
+                var seed_offset_passphrase = $('#seed_offset_passphrase_txt').val();
                 var h =  !isNaN(parseInt(restore_height)) ? parseInt(restore_height) : 0;
                 if(h < 0) h = 0;
 
                 seed = replaceAll(seed, "\\n", " ");
-                app_hub.restore_deterministic_wallet(seed, h, offset_seed_passphrase)
+                app_hub.restore_deterministic_wallet(seed, h, seed_offset_passphrase)
                 return false;
             }
 
@@ -279,7 +279,7 @@ html ="""
                             <textarea id="seed" class="form-control" placeholder="Paste 26 mnemonic seed words here (use [Paste] button above or press Ctrl+V)" style="height:80px;margin-bottom:10px;margin-top:10px;font-size:100%"></textarea>
                             <button id="restore_wallet_btn" type="button" class="btn btn-primary" onclick="restore_wallet()"><i class="fa fa-undo"></i> Restore</button>
                             <input id="restore_height_txt" type="text" class="form-control" style="display: inline-block; float:right; width: 70px" value="0"/> <label for="restore_height_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Restore from height#</label>
-                            <input id="offset_seed_passphrase_txt" type="password" class="form-control" style="display: inline-block; float:right; width: 180px" value=""/> <label for="offset_seed_passphrase_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Offset seed passphrase</label>
+                            <input id="seed_offset_passphrase_txt" type="password" class="form-control" style="display: inline-block; float:right; width: 180px" value=""/> <label for="seed_offset_passphrase_txt" style="font-weight: bold; display:inline-block; float:right; margin-right:20px;">Seed offset passphrase</label>
                         </div>
                     </div>
                 </div>

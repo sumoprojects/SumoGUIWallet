@@ -178,7 +178,7 @@ class WalletRPCManager(ProcessManager):
         self._stopped = True
         self.rpc_request.stop_wallet(no_wait=True)
         counter = 1
-        while self.is_proc_running():
+        while True:
             try:
                 if counter < 30:
                     if counter % 10 == 0:
@@ -186,6 +186,9 @@ class WalletRPCManager(ProcessManager):
                             os.kill(self.proc.pid, signal.CTRL_C_EVENT)
                         except KeyboardInterrupt:
                             pass
+                        sleep(1)
+                        if not self.is_proc_running():
+                            break
                     sleep(1)
                     counter += 1
                 else:
@@ -194,7 +197,6 @@ class WalletRPCManager(ProcessManager):
                     break
             except:
                 break
-
         self._ready = Event()
         log("[%s] stopped" % self.proc_name, LEVEL_INFO, self.proc_name)
 

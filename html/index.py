@@ -621,8 +621,8 @@ html =u"""
                 }, 1000);
 
                 app_hub.on_update_wallet_loading_height_event.connect(function(height, target_height, block_hash){
-                    // console.log(block_hash);
-                    if(!$('#app_modal_progress').is(':visible') && height > target_height - block_sync_size){
+                    //console.log(height);
+                    if($('#app_modal_progress').is(':visible') == false && height > target_height - block_sync_size){
                         return;
                     }
 
@@ -645,11 +645,11 @@ html =u"""
                 });
 
                 app_hub.on_open_existing_wallet_start_event.connect(function(){
-                    show_progress("Opening wallet...");
+                    show_app_progress("Loading wallet...");
                 });
 
                 app_hub.on_open_existing_wallet_complete_event.connect(function(){
-                    hide_progress();
+                    hide_app_progress();
                 });
             }
 

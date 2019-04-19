@@ -305,23 +305,29 @@ class MainWebUI(BaseWebUI):
         self.sumokoind_daemon_pid = self.sumokoind_daemon_manager.get_pid()
 
 
-    def show_wallet(self):
-        QTimer.singleShot(1, self.update_wallet_info)
+    def start_update_wallet_info_timer(self):
         if not hasattr(self, "update_wallet_info_timer"):
             self.update_wallet_info_timer = QTimer(self)
             self.update_wallet_info_timer.timeout.connect(self.update_wallet_info)
-        self.update_wallet_info_timer.stop()
-        self.update_wallet_info_timer.start(UPDATE_WALLET_INFO_INTERVAL)
+        if not self.update_wallet_info_timer.isActive():
+            QTimer.singleShot(250, self.update_wallet_info)
+            self.update_wallet_info_timer.start(UPDATE_WALLET_INFO_INTERVAL)
 
+    def stop_update_wallet_info_timer(self):
+        if hasattr(self, "update_wallet_info_timer"):
+            self.update_wallet_info_timer.stop()
+
+    def show_wallet(self):
         self.show()
         self.trayIcon.show()
+        self.start_update_wallet_info_timer()
 
 
     def hide_wallet(self):
         self.hide()
         self.trayIcon.hide()
 
-    def run_wallet_rpc(self, log_level=0):
+    def run_wallet_rpc(self, log_level=2):
         self.wallet_rpc_manager = WalletRPCManager(self.app.property("ResPath"),
                                                 wallet_dir_path,
                                                 self.app, log_level)
@@ -476,20 +482,18 @@ class MainWebUI(BaseWebUI):
 
 
     def show_new_wallet_ui(self):
-        if hasattr(self, "update_wallet_info_timer"):
-            self.update_wallet_info_timer.stop()
+        self.stop_update_wallet_info_timer()
         if self.wallet_rpc_manager is not None:
             self.wallet_rpc_manager.rpc_request.stop_wallet()
             self.wallet_rpc_manager.reset_block_height()
             self.wallet_rpc_manager.set_ready(False)
 
+        self.run_wallet_rpc()
         self.reset_wallet(delete_files=False)
         self.new_wallet_ui = NewWalletWebUI(self.app, self.hub, self.debug)
         self.hub.setNewWalletUI(self.new_wallet_ui)
         self.new_wallet_ui.run()
-
         self.hide_wallet()
-        self.run_wallet_rpc(2)
 
 
     def reset_wallet(self, delete_files=False):
@@ -501,10 +505,12 @@ class MainWebUI(BaseWebUI):
             except:
                 pass
 
+
         self.wallet_info.reset()
         if self.new_wallet_ui:
             self.hub.on_new_wallet_ui_reset_event.emit()
         self.hub.on_main_wallet_ui_reset_event.emit()
+        self.hub.current_block_height = 0
 
     def notify(self, message, title="", icon=None, msg_type=None):
         if self.notifier.notifier is not None:
@@ -564,7 +570,7 @@ class MainWebUI(BaseWebUI):
                 return
 
             if not self.wallet_rpc_manager:
-                self.run_wallet_rpc(2)
+                self.run_wallet_rpc()
                 while not self.wallet_rpc_manager.is_ready():
                     self.app.processEvents()
 
@@ -609,12 +615,7 @@ class MainWebUI(BaseWebUI):
             else:
                 self.wallet_info.wallet_password = hashlib.sha256(wallet_password).hexdigest()
                 self.update_wallet_info()
-                if not hasattr(self, "update_wallet_info_timer"):
-                    self.update_wallet_info_timer = QTimer(self)
-                    self.update_wallet_info_timer.timeout.connect(self.update_wallet_info)
-
-                self.update_wallet_info_timer.stop()
-                self.update_wallet_info_timer.start(UPDATE_WALLET_INFO_INTERVAL)
+                self.start_update_wallet_info_timer()
         else:
             self.show_new_wallet_ui()
 
@@ -644,8 +645,7 @@ class MainWebUI(BaseWebUI):
         log("%s is about to quit..." % APP_NAME, LEVEL_INFO)
         if hasattr(self, "update_daemon_status_timer"):
             self.update_daemon_status_timer.stop()
-        if hasattr(self, "update_wallet_info_timer"):
-            self.update_wallet_info_timer.stop()
+        self.stop_update_wallet_info_timer()
         if self.wallet_rpc_manager is not None:
             self.wallet_rpc_manager.stop()
         if self.sumokoind_daemon_manager is not None:

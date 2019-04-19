@@ -298,19 +298,13 @@ class Hub(QObject):
                 self.ui.wallet_info.save()
 
                 self.current_block_height = 0 # reset current wallet block height
-                counter = 0
                 self.ui.wallet_rpc_manager.set_ready(False)
                 while not self.ui.wallet_rpc_manager.is_ready():
                     self.app_process_events(1)
                     h = self.ui.wallet_rpc_manager.get_block_height()
-                    if h >  self.current_block_height:
+                    if h > 0:
                         block_hash = self.ui.wallet_rpc_manager.get_block_hash()
                         self.on_new_wallet_update_processed_block_height_event.emit(h, self.ui.current_height, block_hash)
-                        self.current_block_height = h
-                        counter = 0
-                    counter += 1
-                    if counter > 120:
-                        break
 
                 self.show_wallet_info()
         except Exception, err:
@@ -657,7 +651,7 @@ class Hub(QObject):
             else:
                 return
 
-        self.ui.update_wallet_info_timer.stop()
+        self.ui.stop_update_wallet_info_timer()
         self.on_open_existing_wallet_start_event.emit()
         current_wallet_filename = self.ui.wallet_info.wallet_filepath
         try:
@@ -670,7 +664,7 @@ class Hub(QObject):
                 raise Exception(error_message)
 
             self.ui.wallet_rpc_manager.set_ready(False)
-            self.ui.run_wallet_rpc(2)
+            self.ui.run_wallet_rpc()
             while not self.ui.wallet_rpc_manager.is_ready():
                 self.app_process_events(0.1)
 
@@ -688,14 +682,12 @@ class Hub(QObject):
             self.ui.wallet_info.is_loaded =True
             self.ui.wallet_info.save()
 
-            self.app_process_events(5)
             while not self.ui.wallet_rpc_manager.is_ready():
                 self.app_process_events(0.1)
-            self.ui.update_wallet_info()
-            self.app_process_events(0.1)
-            self.on_open_existing_wallet_complete_event.emit()
-            QMessageBox.information(self.ui, "Wallet Loaded", "Wallet ["
-                                    + os.path.basename(wallet_filename) + "] successfully loaded")
+#             self.app_process_events(10)
+#             self.on_open_existing_wallet_complete_event.emit()
+#             QMessageBox.information(self.ui, "Wallet Loaded", "Wallet ["
+#                                     + os.path.basename(wallet_filename) + "] successfully loaded")
         except Exception, err:
             log(str(err), LEVEL_ERROR)
             ret = self.ui.wallet_rpc_manager.rpc_request.open_wallet(
@@ -707,7 +699,7 @@ class Hub(QObject):
             self.ui.wallet_info.save()
             self.on_open_existing_wallet_complete_event.emit()
         finally:
-            self.ui.update_wallet_info_timer.start()
+            self.ui.start_update_wallet_info_timer()
 
 
     @Slot(int)
@@ -725,8 +717,28 @@ class Hub(QObject):
 
         title = None
         if key_type == 1:
+            passphrase, result = self._custom_input_dialog(self.ui, \
+                "Seed Offset Passphrase (Optional)",
+                "Enter optional seed offset passphrase (just leave it blank to see <br>original, unencrypted seed):",
+                QLineEdit.Password)
+            if result:
+                if passphrase:
+                    confirm_passphrase, result = self._custom_input_dialog(self.ui, \
+                        "Confirm Passphrase",
+                        "Confirm seed offset passphrase:",
+                        QLineEdit.Password)
+                    if confirm_passphrase != passphrase:
+                        QMessageBox.warning(self.ui,
+                            'Confirm Passphrase Not Match',
+                            "Confirm passphrase does not match passphrase!")
+                        return
+            else:
+                return
+
+            if not passphrase:
+                passphrase = ""
             title = "Wallet Mnemonic Seed"
-            ret = self.ui.wallet_rpc_manager.rpc_request.query_key("mnemonic")
+            ret = self.ui.wallet_rpc_manager.rpc_request.query_key("mnemonic", passphrase)
         elif key_type == 2:
             title = "Wallet Viewkey"
             ret = self.ui.wallet_rpc_manager.rpc_request.query_key("view_key")
@@ -865,9 +877,12 @@ class Hub(QObject):
 
         h = self.ui.wallet_rpc_manager.get_block_height()
         if h > self.current_block_height:
+            self.ui.stop_update_wallet_info_timer()
             block_hash = self.ui.wallet_rpc_manager.get_block_hash()
             self.on_update_wallet_loading_height_event.emit(h, self.ui.current_height, block_hash)
             self.current_block_height = h
+        else:
+            self.ui.start_update_wallet_info_timer()
 
     @Slot(bool)
     def change_minimize_to_tray(self, status):
