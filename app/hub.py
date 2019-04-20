@@ -20,7 +20,7 @@ from PySide.QtGui import QApplication, QMessageBox, QFileDialog, \
             QInputDialog, QLineEdit
 from PySide.QtCore import QObject, Slot, Signal
 
-from utils.common import print_money, print_money2, readFile
+from utils.common import print_money, print_money2
 
 from settings import APP_NAME, VERSION, DATA_DIR, COIN, makeDir, seed_languages
 from utils.logger import log, LEVEL_ERROR, LEVEL_INFO
@@ -586,7 +586,6 @@ class Hub(QObject):
             QMessageBox.warning(self.ui, "Incorrect Wallet Password", "Wallet password is not correct!")
             return
 
-
         ret = self.ui.wallet_rpc_manager.rpc_request.close_wallet()
         if ret['status'] == "ERROR":
             error_message = ret['message']
@@ -632,7 +631,14 @@ class Hub(QObject):
         if os.path.normpath(os.path.dirname(wallet_filename)) != os.path.normpath(wallet_dir_path):
             QMessageBox.warning(self.ui, \
                 'Open Wallet File',\
-                 """Error: Only wallet files at default location are available for opening""")
+                 """Error: Only wallet files at default location are available for opening.<br>
+                 You can import wallet via 'New... > Import' feature instead.""")
+            return
+
+        if os.path.basename(wallet_filename) == os.path.basename(self.ui.wallet_info.wallet_filepath):
+            QMessageBox.warning(self.ui, \
+                'Open Wallet File',\
+                 """Error: Cannot open the same wallet!""")
             return
 
         while True:
@@ -682,10 +688,6 @@ class Hub(QObject):
 
             while not self.ui.wallet_rpc_manager.is_ready():
                 self.app_process_events(0.1)
-#             self.app_process_events(10)
-#             self.on_open_existing_wallet_complete_event.emit()
-#             QMessageBox.information(self.ui, "Wallet Loaded", "Wallet ["
-#                                     + os.path.basename(wallet_filename) + "] successfully loaded")
         except Exception, err:
             log(str(err), LEVEL_ERROR)
             ret = self.ui.wallet_rpc_manager.rpc_request.open_wallet(
