@@ -646,10 +646,10 @@ class MainWebUI(BaseWebUI):
         if hasattr(self, "update_daemon_status_timer"):
             self.update_daemon_status_timer.stop()
         self.stop_update_wallet_info_timer()
-        if self.wallet_rpc_manager is not None:
-            self.wallet_rpc_manager.stop()
         if self.sumokoind_daemon_manager is not None:
             self.sumokoind_daemon_manager.stop()
+        if self.wallet_rpc_manager is not None:
+            self.wallet_rpc_manager.stop()
 
         self.app_settings.settings['blockchain']['height'] = self.target_height
         self.app_settings.save()
