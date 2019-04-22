@@ -20,13 +20,16 @@ from utils.logger import log, LEVEL_DEBUG, LEVEL_ERROR, LEVEL_INFO
 
 from rpc import WalletRPCRequest
 
+file_system_encoding = sys.getfilesystemencoding()
+
 class ProcessManager(Thread):
-    def __init__(self, bin_path, proc_args, proc_name=""):
+    def __init__(self, exec_path, proc_args, proc_name=""):
         super(ProcessManager, self).__init__()
-        args_array = proc_args.encode(sys.getfilesystemencoding()).split(u' ')
-        args_array.insert(0, bin_path.encode(sys.getfilesystemencoding()))
+        args = proc_args.split(u' ')
+        args.insert(0, exec_path)
+        args_array = [a.encode(file_system_encoding) for a in args]
         self.proc = Popen(args_array,
-                          shell=True,
+                          shell= True if sys.platform in ['win32','cygwin','win64'] else False,
                           stdout=PIPE, stderr=STDOUT, stdin=PIPE)
         self.proc_name = proc_name
         self.daemon = True
@@ -53,10 +56,10 @@ class ProcessManager(Thread):
 
 
 class SumokoindManager(ProcessManager):
-    def __init__(self, resources_path, log_level=0, block_sync_size=20, limit_rate_up=2048, limit_rate_down=8192):
-        bin_path = u'%s/bin/sumokoind' % resources_path
-        proc_args = u'--log-level %d --block-sync-size %d --limit-rate-up %d --limit-rate-down %d' % (log_level, block_sync_size, limit_rate_up, limit_rate_down)
-        super(SumokoindManager, self).__init__(bin_path, proc_args, "sumokoind")
+    def __init__(self, resources_path, log_level=1, block_sync_size=20, limit_rate_up=2048, limit_rate_down=8192):
+        exec_path = u'%s/bin/sumokoind' % resources_path
+        proc_args = u'--log-level=%d --block-sync-size=%d --limit-rate-up=%d --limit-rate-down=%d' % (log_level, block_sync_size, limit_rate_up, limit_rate_down)
+        super(SumokoindManager, self).__init__(exec_path, proc_args, "sumokoind")
 
     def run(self):
         err_str = "ERROR"
@@ -96,10 +99,10 @@ class WalletRPCManager(ProcessManager):
         self.rpc_user_name = str(uuid4().hex)[:12]
         self.rpc_password = str(uuid4().hex)[:12]
         wallet_log_dir_path = os.path.abspath(os.path.join(wallet_dir_path, ".." , "logs", "sumo-wallet-rpc-bin.log"))
-        bin_path = u'%s/bin/sumo-wallet-rpc' % resources_path
-        wallet_rpc_args = u'--wallet-dir %s --log-file %s --rpc-bind-port 19738 --rpc-login %s:%s --log-level %d' \
+        exec_path = u'%s/bin/sumo-wallet-rpc' % resources_path
+        wallet_rpc_args = u'--rpc-bind-port=19738 --wallet-dir=%s --log-file=%s --rpc-login=%s:%s --log-level=%d' \
                                                 % (wallet_dir_path, wallet_log_dir_path, self.rpc_user_name, self.rpc_password, log_level)
-        super(WalletRPCManager, self).__init__(bin_path, wallet_rpc_args, "sumo-wallet-rpc")
+        super(WalletRPCManager, self).__init__(exec_path, wallet_rpc_args, "sumo-wallet-rpc")
         self.rpc_request = WalletRPCRequest(app, self.rpc_user_name, self.rpc_password)
 
         self._ready = False
@@ -158,7 +161,7 @@ class WalletRPCManager(ProcessManager):
         counter = 1
         while self.is_proc_running():
             try:
-                if counter < 20:
+                if counter < 30:
                     if counter % 5 == 0:
                         if hasattr(signal, 'CTRL_C_EVENT'):
                             try:

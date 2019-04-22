@@ -289,7 +289,7 @@ class Hub(QObject):
                     error_message = ret['message']
                     QMessageBox.critical(self.new_wallet_ui, \
                             'Error Restoring Wallet',\
-                            "Error: %s" % error_message)
+                            "Error setting seed language: %s" % error_message)
                     raise Exception("Error restoring wallet: %s" % error_message)
 
                 self.ui.wallet_info.wallet_filepath = wallet_filepath
