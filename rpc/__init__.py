@@ -232,9 +232,10 @@ class WalletRPCRequest():
         rpc_input["params"] = params
         return self.send_request(rpc_input)
 
-    def make_integrated_address(self, payment_id):
+    def make_integrated_address(self, standard_address, payment_id):
         rpc_input = {"method": "make_integrated_address"}
-        params = {"payment_id": payment_id}
+        params = {"standard_address": standard_address,
+                  "payment_id": payment_id}
         rpc_input["params"] = params
         return self.send_request(rpc_input)
 

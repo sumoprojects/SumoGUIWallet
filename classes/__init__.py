@@ -58,7 +58,7 @@ class WalletInfo():
         if os.path.exists(self.wallet_info_filepath):
             try:
                 _wallet_info = json.loads(readFile(self.wallet_info_filepath))
-                if os.path.exists(_wallet_info['wallet_filepath']):
+                if os.path.exists(_wallet_info['wallet_filepath'] + '.keys'):
                     self.wallet_filepath = _wallet_info['wallet_filepath']
                     self.wallet_address =  _wallet_info['wallet_address']
                     self.is_loaded = True
