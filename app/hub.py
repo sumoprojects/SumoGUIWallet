@@ -473,9 +473,15 @@ class Hub(QObject):
             ret = self.ui.wallet_rpc_manager.rpc_request.get_address_book()
             if ret['status'] == "OK" and "entries" in ret:
                 address_book = ret["entries"]
+                for a in address_book:
+                    if a['payment_id'][16:] == "000000000000000000000000000000000000000000000000":
+                        # convert short payment id into integrated address
+                        a['address'] = self.ui.wallet_rpc_manager.rpc_request.make_integrated_address(a['address'], a['payment_id'][:16])["integrated_address"]
+                        a['payment_id'] = "0000000000000000"
             self.ui.wallet_info.wallet_address_book = address_book
 
         self.on_load_address_book_completed_event.emit( json.dumps(self.ui.wallet_info.wallet_address_book) )
+
 
     @Slot(int)
     def delete_address_book(self, index):

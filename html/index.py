@@ -690,13 +690,14 @@ html =u"""
                     var status_text = "Network: " + daemon_status;
                     if(daemon_status == "Connected"){
                         if(sync_pct == 100){
-                            status_text = '<i class="fa fa-rss fa-flip-horizontal"></i>&nbsp;&nbsp;Network synchronized';
+                            status_text = '<i class="fa fa-rss fa-flip-horizontal"></i>&nbsp;&nbsp;Network synced (<strong>100%</strong>)';
                         }
                         else {
-                            status_text = '<i class="fa fa-refresh"></i>&nbsp;&nbsp;Synchronizing...';
+                            status_text = '<i class="fa fa-refresh"></i>&nbsp;&nbsp;Synced '
+                                + current_height + '/' + target_height + ' (<strong>' + sync_pct + '%, '
+                                + (target_height - current_height) + ' left</strong>)';
                         }
                     }
-                    status_text += " " + current_height + "/" + target_height + " (<strong>" + sync_pct + "%</strong>)";
                     progress_bar_text_low.html(status_text);
                     progress_bar_text_high.html(status_text);
 

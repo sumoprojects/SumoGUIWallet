@@ -47,6 +47,7 @@ wallet_dir_path = os.path.join(DATA_DIR, 'wallets')
 makeDir(wallet_dir_path)
 
 INVALID_PASSWORD_STR = "Invalid password"
+BAD_ALLOC_STR = "std::bad_alloc"
 UPDATE_DAEMON_STATUS_INTERVAL = 10000
 UPDATE_WALLET_INFO_INTERVAL = 30000
 MAX_NEW_SUBADDRESSES = 5
@@ -582,7 +583,7 @@ class MainWebUI(BaseWebUI):
                                         wallet_password)
                 if ret['status'] == "ERROR":
                     error_message = ret['message']
-                    QMessageBox.critical(self.new_wallet_ui, \
+                    QMessageBox.critical(self, \
                             'Error Starting Wallet',\
                             "Error: %s" % error_message)
                     if INVALID_PASSWORD_STR in error_message:
@@ -600,6 +601,20 @@ class MainWebUI(BaseWebUI):
                                                 "Password is required to open wallet!")
                             break
                         retrial_counter += 1
+                    elif BAD_ALLOC_STR in error_message:
+                        result = QMessageBox.question(self, "Restore Wallet?", \
+                            "Wallet file appears corrupted or incompatible. This will try to restore wallet from '.keys' file." +
+                            "<br><br><i>Note: Info associated with the wallet like tx notes, saved addresses will be lost!</i>" +
+                            "<br><br>Are you sure to continue?", \
+                            QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
+                        if result == QMessageBox.No:
+                            break
+                        else:
+                            try:
+                                os.remove(self.wallet_info.wallet_filepath)
+                                continue
+                            except:
+                                break
                     else:
                         break
                 else:
@@ -643,6 +658,9 @@ class MainWebUI(BaseWebUI):
 
     def _handleAboutToQuit(self):
         log("%s is about to quit..." % APP_NAME, LEVEL_INFO)
+        self.app_settings.settings['blockchain']['height'] = self.target_height
+        self.app_settings.save()
+
         if hasattr(self, "update_daemon_status_timer"):
             self.update_daemon_status_timer.stop()
         self.stop_update_wallet_info_timer()
@@ -651,5 +669,4 @@ class MainWebUI(BaseWebUI):
         if self.wallet_rpc_manager is not None:
             self.wallet_rpc_manager.stop()
 
-        self.app_settings.settings['blockchain']['height'] = self.target_height
-        self.app_settings.save()
+
