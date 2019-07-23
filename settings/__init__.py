@@ -12,7 +12,7 @@ import logging
 
 from utils.common import getHomeDir, makeDir
 
-VERSION = [0, 2, 1]
+VERSION = [0, 2, 2]
 APP_NAME = "Sumo GUI Wallet"
 USER_AGENT = '%s v%s' % (APP_NAME, '.'.join(str(v) for v in VERSION))
 
