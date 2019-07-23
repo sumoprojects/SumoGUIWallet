@@ -517,8 +517,8 @@ html =u"""
                     var tx_status_text = tx['status'] == "in" || tx['status'] == "out" ? "Completed" :  (tx['status'] == "pending" ? "Pending" : "In Pool");
                     if(tx['confirmation'] < 10){
                         if(tx_status_text == "Completed") tx_status_text = "Locked";
-                        tx_status_text += " (+" + tx['confirmation'] + " confirms)";
                     }
+                    tx_status_text += " (" + tx['confirmation'] + (tx['confirmation'] > 1 ? " confirmations)" : " confirmation)");
 
                     var dest_html = "";
                     if(tx.hasOwnProperty('destinations')){
@@ -748,8 +748,8 @@ html =u"""
                             var tx_status_text = tx['status'] == "in" || tx['status'] == "out" ? "Completed" :  (tx['status'] == "pending" ? "Pending" : "In Pool");
                             if(tx['confirmation'] < 10){
                                 if(tx_status_text == "Completed") tx_status_text = "Locked";
-                                tx_status_text += " (+" + tx['confirmation'] + " confirms)";
                             }
+                            tx_status_text += " (" + tx['confirmation'] + (tx['confirmation'] > 1 ? " confirms)" : " confirm)");
 
                             var tx_rendered = Mustache.render(recent_tx_row_tmpl,
                                                         {   'cls_in_out': tx['status'],
