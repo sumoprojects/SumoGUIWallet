@@ -408,6 +408,7 @@ html =u"""
 
                     $('#up_speed_limit_select').val(app_settings['daemon']['limit_rate_up']);
                     $('#down_speed_limit_select').val(app_settings['daemon']['limit_rate_down']);
+                    $('#use_boostrap_daemon_chk').prop('checked', app_settings['daemon']['use_boostrap_daemon']);
                 });
 
                 app_hub.on_main_wallet_ui_reset_event.connect(reset_wallet_ui);
@@ -438,24 +439,12 @@ html =u"""
                         if(status['message'].search("Invalid address format") >= 0){
                             $('#send_address').parent().addClass('has-error');
                         }
-                        else if(status['message'].search("Payment id has invalid format") >= 0){
-                            $('#send_payment_id').parent().addClass('has-error');
-                        }
                         else if(status['message'].search("not enough money") >= 0){
                             $('#send_amount').parent().addClass('has-error');
                         }
                     }
 
                     btn_send_tx.disable(false);
-                    hide_progress();
-                });
-
-                app_hub.on_generate_payment_id_event.connect(function(payment_id, integrated_address){
-                    $('#receive_payment_id').val(payment_id);
-                    receive_integrated_address.val(integrated_address);
-                    $('#receive_address_qrcode').html("");
-                    $('#receive_address_qrcode').qrcode({width: 220,height: 220, text: integrated_address});
-                    $('#btn_copy_integrated_address').disable(false);
                     hide_progress();
                 });
 
@@ -501,7 +490,6 @@ html =u"""
 
                     $(".address-book-row").click(function() {
                         $("#send_address").val( $(this).data("address") );
-                        $("#send_payment_id").val( $(this).data("payment-id") );
                         hide_app_dialog();
                         return false;
                     });
@@ -923,15 +911,6 @@ html =u"""
                     $('#send_address').parent().removeClass('has-error');
                 }
 
-                var payment_id = $('#send_payment_id').val().trim();
-                if(payment_id && !(payment_id.length == 16 || payment_id.length == 64)){
-                    errors.push("Payment ID must be a 16 or 64 hexadecimal-characters string!");
-                    $('#send_payment_id').parent().addClass('has-error');
-                }
-                else{
-                    $('#send_payment_id').parent().removeClass('has-error');
-                }
-
                 if(errors.length > 0){
                     var msg = "<ul>";
                     for(var i=0; i<errors.length;i++){
@@ -944,16 +923,10 @@ html =u"""
 
                 var tx_desc = $('#send_tx_desc').val().trim();
                 var priority = $('#send_priority').val();
-                var mixin = $('#send_mixins').val();
+                var ring_size = $('#send_ring_size').val();
 
                 btn_send_tx.disable(true);
-                app_hub.send_tx(amount, address, payment_id, priority, mixin, tx_desc, $('#checkbox_save_address').is(":checked"), sweep_all);
-                return false;
-            }
-
-            function generate_payment_id(){
-                show_progress("Generating payment ID, integrated address...");
-                app_hub.generate_payment_id(16);
+                app_hub.send_tx(amount, address, priority, ring_size, tx_desc, $('#checkbox_save_address').is(":checked"), sweep_all);
                 return false;
             }
 
@@ -1178,6 +1151,10 @@ html =u"""
                 $('#down_speed_limit_select').on('change', function(e) {
                     app_hub.change_limit_rate_down(this.value);
                 });
+
+                $("#use_boostrap_daemon_chk").change(function() {
+                    app_hub.change_use_boostrap_daemon(this.checked);
+                });
             });
         </script>
     </head>
@@ -1318,14 +1295,6 @@ html =u"""
                             </div>
                             <div class="form-group">
                                 <div class="col-sm-12">
-                                    <label for="send_payment_id" class="col-xs-2 control-label">Payment ID</label>
-                                    <div class="col-xs-10">
-                                        <input id="send_payment_id" type="text" class="form-control"  placeholder="Paste payment ID here (Ctrl+V, optional)..." maxlength="64"/>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <div class="col-sm-12">
                                     <label for="send_tx_desc" class="col-xs-2 control-label">Description</label>
                                     <div class="col-xs-10">
                                         <input id="send_tx_desc" type="text" class="form-control"  placeholder="Tx description, saved to local wallet history (optional)..." maxlength="255"/>
@@ -1334,13 +1303,13 @@ html =u"""
                             </div>
                             <div class="form-group">
                                 <div class="col-sm-6">
-                                    <label for="send_mixins" class="col-xs-4 control-label">Ringsize <sup>1</sup></label>
+                                    <label for="send_ring_size" class="col-xs-4 control-label">Ringsize <sup>1</sup></label>
                                     <div class="col-xs-8">
-                                        <select id="send_mixins" class="form-control">
-                                          <option value="48" selected>49 (default)</option>
-                                          <option value="60">61</option>
-                                          <option value="72">73</option>
-                                          <option value="96">97</option>
+                                        <select id="send_ring_size" class="form-control">
+                                          <option value="49" selected>49 (default)</option>
+                                          <option value="61">61</option>
+                                          <option value="73">73</option>
+                                          <option value="97">97</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1362,7 +1331,7 @@ html =u"""
                                 <div class="col-sm-12">
                                     <label class="col-xs-2 control-label sr-only">&nbsp;</label>
                                     <div class="col-xs-10">
-                                        <input id="checkbox_save_address" type="checkbox" /> <label for="checkbox_save_address">Save address (with payment id) to address book</label>
+                                        <input id="checkbox_save_address" type="checkbox" /> <label for="checkbox_save_address">Save address to Address Book</label>
                                         <label style="color:#999; font-size: 95%">1. Larger ringsize means higher transaction cost, using default ringsize (49) is highly recommended</label>
                                         <label style="color:#999; font-size: 95%">2. Only choose higher priority when there are many transactions in tx pool or "Normal" works just fine</label>
                                     </div>
@@ -1524,6 +1493,9 @@ html =u"""
                                                 <option value="16384">16384</option>
                                             </select>
                                         </div>
+                                        <div class="col-xs-12" style="margin-top: 20px; margin-bottom: 10px;">
+                                            <input id="use_boostrap_daemon_chk" type="checkbox" value="" checked="checked"> <label class="control-label" for="use_boostrap_daemon_chk">Use boostrap daemon (auto)</label>
+                                        </div>
                                     </div>
                                 </form>
                             </div>
@@ -1535,13 +1507,13 @@ html =u"""
                     </div>
                     <hr style="margin-top:10px;margin-bottom:0px;">
                     <div class="row">
-                        <div class="col-sm-12 form-group" style="margin-bottom: 0px; margin-top: 20px; text-align: center">
-                            <input id="minimize_to_tray_chk" type="checkbox" value="" checked="checked"> <label class="control-label" for="minimize_to_tray_chk">Close wallet to notification area (system tray)</label>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-sm-12" style="margin-top: 10px;text-align: center">
-                            <button id="btn_about" type="button" class="btn btn-primary" onclick="about_app()"><i class="fa fa-user"></i> About...</button>
+                        <div class="col-lg-12">
+                            <div class="col-sm-6 form-group" style="margin-bottom: 0px; margin-top: 20px;">
+                                <input id="minimize_to_tray_chk" type="checkbox" value="" checked="checked"> <label class="control-label" for="minimize_to_tray_chk">Close wallet to notification area (system tray)</label>
+                            </div>
+                            <div class="col-sm-6" style="margin-top: 10px;text-align: right">
+                                <button id="btn_about" type="button" class="btn btn-primary" onclick="about_app()"><i class="fa fa-user"></i> About...</button>
+                            </div>
                         </div>
                     </div>
                 </div>

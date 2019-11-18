@@ -200,28 +200,24 @@ class WalletRPCRequest():
         rpc_input = {"method": "rescan_blockchain"}
         return self.send_request(rpc_input)
 
-    def transfer_split(self, amount, address, payment_id, priority, mixin):
+    def transfer_split(self, amount, address, priority, ring_size):
         rpc_input = {"method": "transfer_split"}
         params = {"destinations": [{"amount" : amount, "address": address}],
                   "priority": priority,
-                  "mixin": mixin}
-        if payment_id:
-            params["payment_id"] = payment_id
+                  "ring_size": ring_size}
 
         rpc_input["params"] = params
         return self.send_request(rpc_input)
 
-    def transfer_all(self, address, payment_id, priority, mixin, account_index=0, subaddr_indices=[0]):
+    def sweep_all(self, address, priority, ring_size, account_index=0, subaddr_indices=[0]):
         rpc_input = {"method": "sweep_all"}
         params = {
             "address": address,
             "account_index": account_index,
             "subaddr_indices": subaddr_indices,
             "priority": priority,
-            "mixin": mixin
+            "ring_size": ring_size
         }
-        if payment_id:
-            params["payment_id"] = payment_id
 
         rpc_input["params"] = params
         return self.send_request(rpc_input)
@@ -243,11 +239,9 @@ class WalletRPCRequest():
         rpc_input = {"method": "get_address_book"}
         return self.send_request(rpc_input)
 
-    def add_address_book(self, address, payment_id, desc):
+    def add_address_book(self, address, desc):
         rpc_input = {"method": "add_address_book"}
         params = {"address": address}
-        if payment_id:
-            params["payment_id"] = payment_id
         if desc:
             params["description"] = desc
         rpc_input["params"] = params

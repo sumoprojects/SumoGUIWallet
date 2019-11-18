@@ -56,9 +56,11 @@ class ProcessManager(Thread):
 
 
 class SumokoindManager(ProcessManager):
-    def __init__(self, resources_path, log_level=1, block_sync_size=20, limit_rate_up=2048, limit_rate_down=8192):
+    def __init__(self, resources_path, log_level=1, block_sync_size=20, limit_rate_up=2048, limit_rate_down=8192, use_bootstrap_daemon=True):
         exec_path = u'%s/bin/sumokoind' % resources_path
         proc_args = u'--log-level=%d --block-sync-size=%d --limit-rate-up=%d --limit-rate-down=%d' % (log_level, block_sync_size, limit_rate_up, limit_rate_down)
+        if use_bootstrap_daemon:
+            proc_args += u' --bootstrap-daemon-address=auto'
         super(SumokoindManager, self).__init__(exec_path, proc_args, "sumokoind")
 
     def run(self):

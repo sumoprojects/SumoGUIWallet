@@ -300,7 +300,8 @@ class MainWebUI(BaseWebUI):
                                             self.app_settings.settings['daemon']['log_level'],
                                             self.app_settings.settings['daemon']['block_sync_size'],
                                             self.app_settings.settings['daemon']['limit_rate_up'],
-                                            self.app_settings.settings['daemon']['limit_rate_down'])
+                                            self.app_settings.settings['daemon']['limit_rate_down'],
+                                            self.app_settings.settings['daemon']['use_boostrap_daemon'])
 
         self.sumokoind_daemon_manager.start()
         self.sumokoind_daemon_pid = self.sumokoind_daemon_manager.get_pid()

@@ -26,6 +26,8 @@ Copyright (c) 2017-2019, Sumokoin Project (www.sumokoin.org)
 			
 			sudo apt install python-pyside
 
+	* `sumokoin-python` lib from [sumokoin-python](https://github.com/sumoprojects/sumokoin-python) repo
+
 
 3. Build/download Sumokoin binaries from [Sumokoin repo](https://github.com/sumoprojects/sumokoin) and put it to `Resources/bin` sub-directory.
 

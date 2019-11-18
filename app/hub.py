@@ -20,6 +20,8 @@ from PySide.QtGui import QApplication, QMessageBox, QFileDialog, \
             QInputDialog, QLineEdit
 from PySide.QtCore import QObject, Slot, Signal
 
+from sumokoin.address import Address
+
 from utils.common import print_money, print_money2
 
 from settings import APP_NAME, VERSION, DATA_DIR, COIN, makeDir, seed_languages
@@ -360,15 +362,8 @@ class Hub(QObject):
         self.on_wallet_rescan_bc_completed_event.emit()
 
 
-    @Slot(float, str, str, int, int, str, bool, bool)
-    def send_tx(self, amount, address, payment_id, priority, mixin, tx_desc, save_address, sweep_all):
-        if not payment_id and not address.startswith("Sumi"):
-            result = QMessageBox.question(self.ui, "Sending Coins Without Payment ID?", \
-                                      "Are you sure to send coins without Payment ID?", \
-                                       QMessageBox.Yes | QMessageBox.No, defaultButton=QMessageBox.No)
-            if result == QMessageBox.No:
-                return
-
+    @Slot(float, str, int, int, str, bool, bool)
+    def send_tx(self, amount, address, priority, ring_size, tx_desc, save_address, sweep_all):
         if sweep_all:
             result = QMessageBox.question(self.ui, "Sending all your coins?", \
                                       "This will send all your coins to target address.<br><br>Are you sure you want to proceed?", \
@@ -396,10 +391,10 @@ class Hub(QObject):
             for s in per_subaddress:
                 if s['unlocked_balance'] > 0:
                     subaddr_indices.append(s['address_index'])
-            ret = self.ui.wallet_rpc_manager.rpc_request.transfer_all(address, payment_id, priority, mixin, 0, subaddr_indices)
+            ret = self.ui.wallet_rpc_manager.rpc_request.sweep_all(address, priority, ring_size, 0, subaddr_indices)
         else:
             ret = self.ui.wallet_rpc_manager.rpc_request.transfer_split(amount, \
-                                                address, payment_id, priority, mixin)
+                                                address, priority, ring_size)
 
         if ret['status'] == "ERROR":
             self.on_wallet_send_tx_completed_event.emit(json.dumps(ret));
@@ -432,19 +427,18 @@ class Hub(QObject):
                     msg += "- Transaction ID: %s <br>  - Amount: %s <br>  - Fee: %s <br><br>" % (ret['tx_hash_list'][i], \
                                                         print_money2(ret['amount_list'][i]), \
                                                         print_money2(ret['fee_list'][i]))
-            QMessageBox.information(self.ui, 'Coins Sent', msg)
+            QMessageBox.information(self.ui, 'Transaction Complete', msg)
             self.ui.update_wallet_info()
 
             if save_address:
                 desc, _ = self._custom_input_dialog(self.ui, \
                         'Saving Address...', \
                         "Address description/note (optional):")
-                ret = self.ui.wallet_rpc_manager.rpc_request.add_address_book(address, \
-                                                                              payment_id, desc)
+                ret = self.ui.wallet_rpc_manager.rpc_request.add_address_book(address, desc)
                 if ret['status'] == "OK":
                     if self.ui.wallet_info.wallet_address_book:
                         address_entry = {"address": address,
-                                     "payment_id": payment_id,
+                                     "payment_id": "",
                                      "description": desc[0:200],
                                      "index": ret["index"]
                                      }
@@ -452,14 +446,6 @@ class Hub(QObject):
 
                     QMessageBox.information(self.ui, "Address Saved", \
                                             "Address (and payment ID) saved to address book.")
-
-
-    @Slot(int)
-    def generate_payment_id(self, hex_length=16):
-        payment_id = binascii.b2a_hex(os.urandom(hex_length/2))
-        integrated_address = self.ui.wallet_rpc_manager.rpc_request.make_integrated_address(payment_id)["integrated_address"]
-        self.on_generate_payment_id_event.emit(payment_id, integrated_address);
-
 
     @Slot(str)
     def copy_text(self, text):
@@ -476,7 +462,9 @@ class Hub(QObject):
                 for a in address_book:
                     if a['payment_id'][16:] == "000000000000000000000000000000000000000000000000":
                         # convert short payment id into integrated address
-                        a['address'] = self.ui.wallet_rpc_manager.rpc_request.make_integrated_address(a['address'], a['payment_id'][:16])["integrated_address"]
+                        addr = Address(a['address'])
+                        ia = addr.with_payment_id(a['payment_id'][:16])
+                        a['address'] = str(ia)
                         a['payment_id'] = "0000000000000000"
             self.ui.wallet_info.wallet_address_book = address_book
 
@@ -907,6 +895,11 @@ class Hub(QObject):
         self.ui.app_settings.settings['daemon']['limit_rate_down'] = limit_rate_down
         self.ui.app_settings.save()
 
+    @Slot(bool)
+    def change_use_boostrap_daemon(self, status):
+        self.ui.app_settings.settings['daemon']['use_boostrap_daemon'] = status
+        self.ui.app_settings.save()
+
 
     def update_daemon_status(self, status):
         self.on_daemon_update_status_event.emit(status)
@@ -972,7 +965,6 @@ class Hub(QObject):
     on_wallet_rescan_spent_completed_event = Signal()
     on_wallet_rescan_bc_completed_event = Signal()
     on_wallet_send_tx_completed_event = Signal(str)
-    on_generate_payment_id_event = Signal(str, str)
     on_load_address_book_completed_event = Signal(str)
     on_tx_detail_found_event = Signal(str)
     on_load_tx_history_completed_event = Signal(str)

@@ -94,6 +94,7 @@ class AppSettings():
             "block_sync_size": 20,
             "limit_rate_up": 2048,
             "limit_rate_down": 8192,
+            "use_boostrap_daemon": True,
         },
 
         "blockchain": {
@@ -137,6 +138,11 @@ class AppSettings():
 
         if self.settings["daemon"]["limit_rate_down"] not in self.limit_rate_downs:
             self.settings["daemon"]["limit_rate_down"] = self.default_settings["daemon"]["limit_rate_down"]
+
+        try:
+            self.settings["daemon"]["use_boostrap_daemon"] = bool(self.settings["daemon"]["use_boostrap_daemon"])
+        except:
+            self.settings["daemon"]["use_boostrap_daemon"] = self.default_settings["daemon"]["use_boostrap_daemon"]
 
         try:
             self.settings["blockchain"]["height"] = abs(int(self.settings["blockchain"]["height"]))
