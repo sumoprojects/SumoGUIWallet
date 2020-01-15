@@ -91,7 +91,7 @@ class AppSettings():
     default_settings = {
         "daemon": {
             "log_level": 0,
-            "block_sync_size": 20,
+            "block_sync_size": 50,
             "limit_rate_up": 2048,
             "limit_rate_down": 8192,
             "use_boostrap_daemon": True,

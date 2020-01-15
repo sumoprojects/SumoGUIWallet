@@ -394,7 +394,7 @@ html =u"""
         <script src="./scripts/jquery.qrcode.min.js"></script>
         <script src="./scripts/utils.js"></script>
         <script type="text/javascript">
-            var block_sync_size = 20;
+            var block_sync_size = 50;
             function app_ready(){
                 setTimeout(app_hub.load_app_settings, 2000);
                 app_hub.on_load_app_settings_completed_event.connect(function(app_settings_json){
@@ -1440,13 +1440,13 @@ html =u"""
                                             </div>
                                             <div class="radio">
                                               <label>
-                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_20" value="20" onclick="set_block_sync_size(20)" checked="">
+                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_20" value="20" onclick="set_block_sync_size(20)">
                                                 20 (default, for normal network)
                                               </label>
                                             </div>
                                             <div class="radio">
                                               <label>
-                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_50" value="50" onclick="set_block_sync_size(50)">
+                                                <input type="radio" name="daemon_block_sync_size" id="block_sync_size_50" value="50" onclick="set_block_sync_size(50)" checked="">
                                                 50 (for good network)
                                               </label>
                                             </div>
@@ -1494,7 +1494,7 @@ html =u"""
                                             </select>
                                         </div>
                                         <div class="col-xs-12" style="margin-top: 20px; margin-bottom: 10px;">
-                                            <input id="use_boostrap_daemon_chk" type="checkbox" value="" checked="checked"> <label class="control-label" for="use_boostrap_daemon_chk">Use boostrap daemon (auto)</label>
+                                            <input id="use_boostrap_daemon_chk" type="checkbox" value="" checked="checked"> <label class="control-label" for="use_boostrap_daemon_chk">Use bootstrap daemon (auto)</label>
                                         </div>
                                     </div>
                                 </form>
