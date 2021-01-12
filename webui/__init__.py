@@ -343,11 +343,15 @@ class MainWebUI(BaseWebUI):
 
     def _update_daemon_status(self):
         target_height = 0
+        network_height = 0
+        untrusted = False
         sumokoind_info = self.daemon_rpc_request.get_info()
         if sumokoind_info['status'] == "OK":
             status = "Connected"
-            self.current_height = int(sumokoind_info['height'])
+            self.current_height = int(sumokoind_info['height_without_bootstrap'])
+            network_height = int(sumokoind_info['height'])
             target_height = int(sumokoind_info['target_height'])
+            untrusted = bool(sumokoind_info['untrusted'])
             if target_height == 0 or target_height < self.current_height:
                 target_height = self.current_height
             if self.target_height < target_height:
@@ -359,14 +363,16 @@ class MainWebUI(BaseWebUI):
 
         info = {"status": status,
                 "current_height": self.current_height,
+                "network_height": network_height,
                 "target_height": self.target_height,
+                "untrusted": untrusted
             }
 
         self.hub.update_daemon_status(json.dumps(info))
 
-        sync_status = "Disconnected" if sumokoind_info['status'] != "OK" else "Synchronizing..."
+        sync_status = "Disconnected" if sumokoind_info['status'] != "OK" else "Syncing..."
         if sumokoind_info['status'] == "OK" and self.current_height == self.target_height:
-            sync_status = "Network synchronized"
+            sync_status = "Network synced"
 
         self.trayIcon.setToolTip("%s\n%s (%d/%d)" % (tray_icon_tooltip, sync_status,
                                                self.current_height, self.target_height))
@@ -467,11 +473,17 @@ class MainWebUI(BaseWebUI):
 
                 # auto-generate new subaddresses if not enough available
                 if len(wallet_info['new_subaddresses']) < MAX_NEW_SUBADDRESSES:
-                    for _ in range(MAX_NEW_SUBADDRESSES - len(wallet_info['new_subaddresses'])):
-                        new_subaddress = self.wallet_rpc_manager.rpc_request.create_address()
-                        new_subaddress['label'] = ""
-                        new_subaddress['used'] = False
-                        wallet_info['new_subaddresses'].append(new_subaddress)
+                    count = MAX_NEW_SUBADDRESSES - len(wallet_info['new_subaddresses'])
+                    new_subaddress = self.wallet_rpc_manager.rpc_request.create_address(count)
+                    i = 0
+                    for addr in new_subaddress['addresses']:
+                        wallet_info['new_subaddresses'].append({
+                            'label': '',
+                            'used': False,
+                            'address': addr,
+                            'address_index': new_subaddress['address_indices'][i]
+                        })
+                        i += 1
 
                 if len(wallet_info['new_subaddresses']) > MAX_NEW_SUBADDRESSES:
                     wallet_info['new_subaddresses'] = wallet_info['new_subaddresses'][0:MAX_NEW_SUBADDRESSES]

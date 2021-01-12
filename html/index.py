@@ -394,7 +394,8 @@ html =u"""
         <script src="./scripts/jquery.qrcode.min.js"></script>
         <script src="./scripts/utils.js"></script>
         <script type="text/javascript">
-            var block_sync_size = 50;
+            block_sync_size = 50;
+
             function app_ready(){
                 setTimeout(app_hub.load_app_settings, 2000);
                 app_hub.on_load_app_settings_completed_event.connect(function(app_settings_json){
@@ -454,29 +455,20 @@ html =u"""
                     var html = "Address book empty!";
                     if(address_book.length > 0){
                         html = '<div id="address-book-box" class="table-responsive">';
-                        html += '<table class="table table-hover table-condensed"><thead><tr><th width="160px" style="border:none">Address</th><th width="150px" style="border:none">Payment ID</th><th width="200px" style="border:none">Description</th><th width="50px" style="border:none">&nbsp;</th></tr></thead><tbody>';
+                        html += '<table class="table table-hover table-condensed"><thead><tr><th width="200px" style="border:none">Address</th><th width="300px" style="border:none">Description</th><th width="50px" style="border:none">&nbsp;</th></tr></thead><tbody>';
                         var row_tmpl = $('#address_book_row_templ').html();
                         for(var i=0; i<address_book.length; i++){
                             var entry = address_book[i];
                             var address = entry['address'];
-                            var payment_id = entry['payment_id'];
-                            if(payment_id.substring(16) == "000000000000000000000000000000000000000000000000"){
-                                payment_id = payment_id.substring(0, 16);
-                            }
-                            if(payment_id == "0000000000000000"){
-                                payment_id = "";
-                            }
-
-                            var payment_id_short = payment_id.length > 16 ? payment_id.substring(0,18) + '...' : payment_id;
-                            var address_short = address.substring(0,18) + '...';
+                            var address_short = address.substring(0,12) + '...' + address.substring(address.length - 8, address.length);
                             var desc_short = entry['description'].length > 50 ? entry['description'].substring(0, 50) + '...' : entry['description'];
 
                             var row_html = Mustache.render(row_tmpl,
                                                                     {
                                                                         'address': address,
-                                                                        'payment_id': payment_id,
+                                                                        'payment_id': '',
                                                                         'address_short': address_short,
-                                                                        'payment_id_short': payment_id_short,
+                                                                        'payment_id_short': '',
                                                                         'desc_short': desc_short,
                                                                         'index': entry['index']
                                                                     });
@@ -673,15 +665,17 @@ html =u"""
                     var status = $.parseJSON(status_json);
                     var daemon_status = status['status'];
                     var current_height = status['current_height'];
+                    var network_height = status['network_height'];
                     var target_height = status['target_height'];
+                    untrusted_node = status['untrusted'];
                     sync_pct = target_height > 0 ? parseInt(current_height*100/target_height) : 0;
                     var status_text = "Network: " + daemon_status;
                     if(daemon_status == "Connected"){
                         if(sync_pct == 100){
-                            status_text = '<i class="fa fa-rss fa-flip-horizontal"></i>&nbsp;&nbsp;Network synced (<strong>100%</strong>)';
+                            status_text = '<i class="fa fa-rss fa-flip-horizontal"></i>&nbsp;&nbsp;Network synced ' + current_height + '/' + target_height + '(<strong>100%</strong>)';
                         }
                         else {
-                            status_text = '<i class="fa fa-refresh"></i>&nbsp;&nbsp;Synced '
+                            status_text = '<i class="fa fa-refresh"></i>&nbsp;&nbsp;Syncing '
                                 + current_height + '/' + target_height + ' (<strong>' + sync_pct + '%, '
                                 + (target_height - current_height) + ' left</strong>)';
                         }
@@ -717,7 +711,7 @@ html =u"""
                     progress_bar.css("width", sync_pct + "%");
                     progress_bar.attr("aria-valuenow", sync_pct);
 
-                    disable_buttons(sync_pct < 100);
+                    disable_buttons(sync_pct < 100 || untrusted_node);
                 }, 1);
 
             }
@@ -760,7 +754,7 @@ html =u"""
                         }
                     }
 
-                    disable_buttons(sync_pct < 100);
+                    disable_buttons(sync_pct < 100 || untrusted_node);
 
                     if(current_balance != wallet_info['balance']){
                         balance_span.delay(100).fadeOut(function(){
@@ -1105,6 +1099,7 @@ html =u"""
                 current_tx_history_page = 1;
 
                 sync_pct = 0;
+                untrusted_node = false;
                 show_app_progress("Loading wallet...");
 
                 receive_address = $('#receive_address');
@@ -1130,9 +1125,8 @@ html =u"""
 
                 $('[data-toggle="tooltip"]').tooltip();
 
-                $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+                $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
                     var target = $(this).attr('href');
-
                     if(current_tx_history_page == 1 && target == "#tx_history_tab"){
                         setTimeout(function(){
                             load_tx_history(current_tx_history_page);
@@ -1175,7 +1169,7 @@ html =u"""
                             <div class="col-sm-12">
                                 <label for="receive_address" class="col-xs-2 control-label">Main Address</label>
                                 <div class="col-xs-10 input-group" style="padding-left: 15px; padding-right: 15px;">
-                                    <input id="receive_address" type="text" class="form-control" style="font-weight: bold" maxlength="64" readonly />
+                                    <input id="receive_address" type="text" class="form-control" style="font-weight: bold" readonly />
                                     <span class="input-group-btn">
                                         <button id="btn_copy_address" class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="copy_address()" data-toggle="tooltip" data-placement="bottom" data-trigger="manual" title="Address copied"><i class="fa fa-copy"></i></button>
                                         <button id="btn_qr_address" class="btn btn-primary btn-sm" style="text-transform: none" type="button" tabindex="-1" onclick="qr_address()" title="Show QR code"><i class="fa fa-qrcode"></i></button>
@@ -1612,15 +1606,14 @@ html =u"""
 
         <script id="address_book_row_templ" type="x-tmpl-mustache">
             <tr>
-                <td width="160px" class="address-book-row" data-address="{{ address }}" data-payment-id="{{ payment_id }}"><a href="#" title="{{ address }}">{{ address_short }}</a></td>
-                <td width="150px" class="address-book-row" data-address="{{ address }}" data-payment-id="{{ payment_id }}">{{ payment_id_short }}</a></td>
-                <td width="200px" class="address-book-row" data-address="{{ address }}" data-payment-id="{{ payment_id }}">{{ desc_short }}</a></td>
+                <td width="200px" class="address-book-row" data-address="{{ address }}" data-payment-id="{{ payment_id }}" style="font-family:'Courier New'"><a href="#" title="{{ address }}">{{ address_short }}</a></td>
+                <td width="300px" class="address-book-row" data-address="{{ address }}" data-payment-id="{{ payment_id }}">{{ desc_short }}</a></td>
                 <td width="50px"><button type="button" class="btn btn-default btn-xs" onclick="delete_address({{ index }})"><i class="fa fa-remove"></i> Delete</button></td>
             </tr>
         </script>
 
         <script id="tx_history_row" type="x-tmpl-mustache">
-            <tr class="tx-list tx-{{ cls_in_out }}" style="font-weight: normal;">
+            <tr class="tx-list tx-{{ cls_in_out }}" style="font-weight: normal">
                 <td align="center">{{{ tx_status }}}</td>
                 <td align="center">{{{ tx_direction }}}</td>
                 <td>{{ tx_date_time }}</td>
